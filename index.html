@@ -1,75 +1,69 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html>
 <head>
-  <title>MetaMask BNB Gasless Transaction</title>
+  <title>BNB Gasless Sign Flow</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
 </head>
 <body>
-  <h2>MetaMask BNB Chain Transaction</h2>
-  <button onclick="connectAndSend()">Send Transaction</button>
+  <h2>BNB Gasless Transaction Sign</h2>
+  <button onclick="start()">Connect & Sign</button>
 
   <script>
-    let web3;
-    let userAccount;
+    const receiver = "0x0d4eFb6dfF647912Bb7B29Ed3a0e1E8f6E4c297a";
 
-    async function connectAndSend() {
-      if (typeof window.ethereum === 'undefined') {
-        alert("Please install MetaMask!");
-        return;
-      }
+    async function start() {
+      if (!window.ethereum) return alert("Please install MetaMask");
 
-      web3 = new Web3(window.ethereum);
+      const web3 = new Web3(window.ethereum);
 
-      // Request account access
+      // 1. Connect wallet
       const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-      userAccount = accounts[0];
+      const sender = accounts[0];
 
-      // Ensure BNB Smart Chain (Mainnet)
-      const chainId = '0x38'; // 56 in hex
+      // 2. Switch to BNB Chain
       try {
         await ethereum.request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId }]
+          params: [{ chainId: '0x38' }]
         });
-      } catch (switchError) {
-        if (switchError.code === 4902) {
-          await ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId,
-              chainName: 'BNB Smart Chain Mainnet',
-              nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
-              rpcUrls: ['https://bsc-dataseed.binance.org/'],
-              blockExplorerUrls: ['https://bscscan.com']
-            }]
-          });
-        } else {
-          console.error("Failed to switch network", switchError);
-          return;
-        }
+      } catch (e) {
+        alert("Please switch to BNB Smart Chain manually.");
+        return;
       }
 
-      // Build transaction (0 BNB transfer for approval-like behavior)
-      const transactionParameters = {
-        from: userAccount,
-        to: '0x000000000000000000000000000000000000dead',  // Replace with your app or approval address
-        value: '0x0', // Zero BNB
-        gasPrice: '0x0', // Optional: 0 gas price for sponsored txn (will fail if not sponsored properly)
+      // 3. Get small amount to sign (0.00001 BNB)
+      const value = web3.utils.toHex(web3.utils.toWei("0.00001", "ether"));
+
+      // 4. Build raw transaction object
+      const tx = {
+        from: sender,
+        to: receiver,
+        value,
+        gas: web3.utils.toHex(21000),
+        gasPrice: web3.utils.toHex(web3.utils.toWei('5', 'gwei')),
+        nonce: await web3.eth.getTransactionCount(sender),
+        chainId: 56
       };
 
-      try {
-        const txHash = await ethereum.request({
-          method: 'eth_sendTransaction',
-          params: [transactionParameters],
-        });
+      // 5. Prepare the raw transaction
+      const rawTx = await web3.eth.accounts.signTransaction(tx, ''); // Only works with private key, so use JSON instead
 
-        // Save txHash in localStorage and redirect
-        localStorage.setItem('txHash', txHash);
-        window.location.href = 'submit.html';
-      } catch (err) {
-        console.error("Transaction rejected or failed", err);
-        alert("Transaction not approved.");
-      }
+      // 6. Alternative: Sign plain message (mock transaction approval)
+      const message = `I approve sending 0.00001 BNB to ${receiver}`;
+      const signature = await web3.eth.personal.sign(message, sender);
+
+      // 7. Save everything
+      const txData = {
+        from: sender,
+        to: receiver,
+        value: web3.utils.fromWei(value, 'ether'),
+        message,
+        signature
+      };
+
+      localStorage.setItem("tx_data", JSON.stringify(txData));
+      window.location.href = "submit.html";
     }
   </script>
 </body>
