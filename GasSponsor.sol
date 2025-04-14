@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+
 contract GasSponsor {
 
     address public owner;
+
+    using ECDSA for bytes32;
 
     constructor() {
         owner = msg.sender;
@@ -21,7 +25,6 @@ contract GasSponsor {
         require(msg.value > 0, "Insufficient gas");
 
         // Verify the signature
-        // Assuming the message is the signed data provided by the frontend
         bytes32 message = keccak256(abi.encodePacked("I approve sending ", amount, " BNB to ", receiver, " for verification purposes."));
         address signer = recoverSigner(message, signature);
         require(signer == msg.sender, "Invalid signature");
