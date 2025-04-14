@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Signature Verification</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 30px;
+      color: #333;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background: #fff;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      color: #0084ff;
+    }
+
+    label {
+      font-weight: bold;
+      margin-top: 10px;
+      display: block;
+    }
+
+    textarea, input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      resize: vertical;
+    }
+
+    button {
+      background-color: #0084ff;
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 16px;
+      margin-top: 15px;
+      cursor: pointer;
+    }
+
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #e9f5ff;
+      border-radius: 8px;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Verify Wallet Signature</h2>
+
+    <label>Original Message:</label>
+    <textarea id="message" rows="3">Send 1 BNB to 0x0d4efb6dff647912bb7b29ed3a0e1e8f6e4c297a</textarea>
+
+    <label>Signature:</label>
+    <textarea id="signature" rows="4">0x220ac1af2b393aa5914ffc6a1558262e334465c212e75aa20d8dec9d6b3d914d7ab94b813eec52760867052d7d632628ec62ffc4c709a87cbe96806714f931d61b</textarea>
+
+    <button onclick="verifySignature()">Verify Signature</button>
+
+    <div class="result" id="result" style="display:none;"></div>
+  </div>
+
+  <script>
+    function verifySignature() {
+      const web3 = new Web3();
+
+      const originalMessage = document.getElementById("message").value.trim();
+      const signature = document.getElementById("signature").value.trim();
+
+      try {
+        const signer = web3.eth.accounts.recover(originalMessage, signature);
+        document.getElementById("result").style.display = "block";
+        document.getElementById("result").innerHTML = `
+          ✅ <strong>Signature is valid!</strong><br>
+          <strong>Signed By Address:</strong><br> ${signer}
+        `;
+      } catch (err) {
+        document.getElementById("result").style.display = "block";
+        document.getElementById("result").innerHTML = `
+          ❌ <strong>Invalid Signature</strong><br>
+          Error: ${err.message}
+        `;
+      }
+    }
+  </script>
+</body>
+</html>
