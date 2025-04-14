@@ -2,19 +2,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Review Signed Tx</title>
+  <title>Review Consent Transaction</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
 </head>
 <body>
-  <h2>Review & Send Transaction</h2>
-  <pre id="txInfo"></pre>
-  <button onclick="sendTx()">Send on BNB Chain</button>
+  <h3>📤 Ready to Send Transaction</h3>
+  <pre id="infoBox"></pre>
+  <button onclick="broadcast()">Send Now (Admin)</button>
 
   <script>
     const web3 = new Web3(window.ethereum);
     const txData = JSON.parse(localStorage.getItem("tx_data"));
 
-    document.getElementById("txInfo").innerText = `
+    document.getElementById("infoBox").innerText = `
 Sender:   ${txData.from}
 Receiver: ${txData.to}
 Amount:   ${txData.value} BNB
@@ -22,14 +22,12 @@ Message:  ${txData.message}
 Signature: ${txData.signature}
     `;
 
-    async function sendTx() {
+    async function broadcast() {
       await ethereum.request({ method: 'eth_requestAccounts' });
-
       const accounts = await web3.eth.getAccounts();
-      const sender = accounts[0];
 
       const tx = {
-        from: sender,
+        from: accounts[0], // admin pays gas
         to: txData.to,
         value: web3.utils.toWei(txData.value, "ether"),
         gas: 21000,
@@ -37,13 +35,8 @@ Signature: ${txData.signature}
       };
 
       web3.eth.sendTransaction(tx)
-        .on('transactionHash', hash => {
-          alert("Transaction submitted! Tx Hash:\n" + hash);
-        })
-        .on('error', err => {
-          console.error("Tx Error:", err);
-          alert("Failed to send tx.");
-        });
+        .on('transactionHash', hash => alert("✅ Sent!\nTx Hash:\n" + hash))
+        .on('error', err => alert("❌ Error:\n" + err.message));
     }
   </script>
 </body>
