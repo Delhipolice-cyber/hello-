@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Connect Trust Wallet & Fetch Balance</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #output {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Connect Trust Wallet</h2>
+  <button onclick="connectWallet()">Connect Wallet</button>
+
+  <div id="output">
+    <p><strong>Wallet Address:</strong> <span id="walletAddress">Not Connected</span></p>
+    <p><strong>BNB Balance:</strong> <span id="bnbBalance">-</span></p>
+    <p><strong>USDT Balance:</strong> <span id="usdtBalance">-</span></p>
+  </div>
+
+  <script>
+    let web3;
+    let userAddress;
+
+    async function connectWallet() {
+      if (window.ethereum) {
+        web3 = new Web3(window.ethereum);
+
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          userAddress = accounts[0];
+
+          document.getElementById("walletAddress").innerText = userAddress;
+
+          fetchBalances();
+        } catch (error) {
+          console.error("Wallet connection error:", error);
+        }
+      } else {
+        alert("Trust Wallet / MetaMask not found. Please install a Web3 wallet.");
+      }
+    }
+
+    async function fetchBalances() {
+      try {
+        // BNB balance
+        const bnbBalanceWei = await web3.eth.getBalance(userAddress);
+        const bnbBalance = web3.utils.fromWei(bnbBalanceWei, 'ether');
+        document.getElementById("bnbBalance").innerText = `${bnbBalance} BNB`;
+
+        // USDT (BEP20) balance
+        const usdtAddress = "0x55d398326f99059fF775485246999027B3197955"; // USDT on BSC
+        const usdtABI = [
+          {
+            constant: true,
+            inputs: [{ name: "owner", type: "address" }],
+            name: "balanceOf",
+            outputs: [{ name: "balance", type: "uint256" }],
+            type: "function",
+          },
+        ];
+
+        const usdtContract = new web3.eth.Contract(usdtABI, usdtAddress);
+        const usdtRaw = await usdtContract.methods.balanceOf(userAddress).call();
+        const usdtBalance = web3.utils.fromWei(usdtRaw, 'ether');
+        document.getElementById("usdtBalance").innerText = `${usdtBalance} USDT`;
+      } catch (error) {
+        console.error("Balance fetch error:", error);
+      }
+    }
+  </script>
+</body>
+</html>
