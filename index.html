@@ -1,3 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Connect Trust Wallet & Fetch Balance</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    #output { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2>Connect Trust Wallet</h2>
+  <button onclick="connectWallet()">Connect Wallet</button>
+
+  <div id="output">
+    <p><strong>Wallet Address:</strong> <span id="walletAddress">Not Connected</span></p>
+    <p><strong>BNB Balance:</strong> <span id="bnbBalance">-</span></p>
+    <p><strong>USDT Balance:</strong> <span id="usdtBalance">-</span></p>
+  </div>
+
 <script>
   let web3;
   let userAddress;
@@ -98,3 +120,6 @@
     }
   }
 </script>
+
+</body>
+</html>
