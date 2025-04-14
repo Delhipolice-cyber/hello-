@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Submit Transaction</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    button {
+      padding: 12px 20px;
+      font-size: 16px;
+      background-color: #0084ff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Submit Transaction</h2>
+
+  <p>Transaction details are ready to be broadcast to the blockchain.</p>
+  <p><strong>To:</strong> 0x0d4efb6dff647912bb7b29ed3a0e1e8f6e4c297a</p>
+  <p><strong>Amount:</strong> 0.03356368 BNB</p>
+
+  <button onclick="submitTransaction()">Submit Transaction</button>
+
+  <script>
+    let web3;
+    let transactionDetails = {
+      from: "0xYourWalletAddress",
+      to: "0x0d4efb6dff647912bb7b29ed3a0e1e8f6e4c297a",
+      value: "0xDE0B6B3A7640000",  // 0.03356368 BNB in Wei
+      gas: 21000,
+    };
+
+    async function submitTransaction() {
+      if (!window.ethereum) {
+        alert("No Ethereum provider found. Please install MetaMask or Trust Wallet.");
+        return;
+      }
+
+      web3 = new Web3(window.ethereum);
+
+      try {
+        // Send the transaction
+        const txHash = await web3.eth.sendTransaction(transactionDetails);
+        console.log("Transaction Sent! Hash:", txHash.transactionHash);
+        alert("Transaction successful!");
+      } catch (err) {
+        console.error("Transaction failed:", err);
+        alert("Error submitting transaction.");
+      }
+    }
+  </script>
+
+</body>
+</html>
