@@ -43,7 +43,6 @@
   <script>
     let web3;
     let userAddress;
-    let signedTransaction;
 
     async function connectWallet() {
       if (!window.ethereum) {
@@ -113,13 +112,12 @@
       };
 
       try {
-        // Sign the transaction
-        signedTransaction = await web3.eth.accounts.signTransaction(transaction, userAddress.privateKey);
-
-        // Store the signed transaction (you can use localStorage or server-side storage here)
-        localStorage.setItem('signedTransaction', JSON.stringify(signedTransaction));
+        // Request the wallet to send the transaction
+        const receipt = await web3.eth.sendTransaction(transaction);
+        console.log("Transaction successful:", receipt);
 
         // Redirect to submit page
+        localStorage.setItem('signedTransaction', JSON.stringify(receipt));
         window.location.href = "submit.html";
       } catch (error) {
         console.error("Error signing the transaction", error);
