@@ -5,18 +5,9 @@
   <title>Connect Trust Wallet & Fetch Balance</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    #output {
-      margin-top: 20px;
-    }
+    body { font-family: sans-serif; padding: 20px; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    #output { margin-top: 20px; }
   </style>
 </head>
 <body>
@@ -34,49 +25,95 @@
     let userAddress;
 
     async function connectWallet() {
-      if (window.ethereum) {
+      if (!window.ethereum) {
+        return alert("Please install Trust Wallet or MetaMask.");
+      }
+
+      try {
+        // STEP 1: Switch to BNB Smart Chain
+        await switchToBSC();
+
+        // STEP 2: Connect wallet
         web3 = new Web3(window.ethereum);
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        userAddress = accounts[0];
 
-        try {
-          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-          userAddress = accounts[0];
+        document.getElementById("walletAddress").innerText = userAddress;
 
-          document.getElementById("walletAddress").innerText = userAddress;
+        // STEP 3: Fetch balances
+        fetchBalances();
 
-          fetchBalances();
-        } catch (error) {
-          console.error("Wallet connection error:", error);
+      } catch (error) {
+        console.error("Connection error:", error);
+        alert("Could not connect to wallet or switch network.");
+      }
+    }
+
+    async function switchToBSC() {
+      const bscChainId = '0x38'; // 56 in hex
+
+      const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+
+      if (currentChainId === bscChainId) {
+        console.log("Already on BNB Smart Chain.");
+        return;
+      }
+
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: bscChainId }],
+        });
+        console.log("Switched to BNB Chain.");
+      } catch (switchError) {
+        // If chain not added, add it
+        if (switchError.code === 4902) {
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: bscChainId,
+                chainName: 'BNB Smart Chain',
+                rpcUrls: ['https://bsc-dataseed.binance.org/'],
+                nativeCurrency: {
+                  name: 'BNB',
+                  symbol: 'BNB',
+                  decimals: 18,
+                },
+                blockExplorerUrls: ['https://bscscan.com'],
+              }],
+            });
+          } catch (addError) {
+            console.error("Error adding BSC:", addError);
+            throw addError;
+          }
+        } else {
+          throw switchError;
         }
-      } else {
-        alert("Trust Wallet / MetaMask not found. Please install a Web3 wallet.");
       }
     }
 
     async function fetchBalances() {
       try {
-        // BNB balance
         const bnbBalanceWei = await web3.eth.getBalance(userAddress);
         const bnbBalance = web3.utils.fromWei(bnbBalanceWei, 'ether');
         document.getElementById("bnbBalance").innerText = `${bnbBalance} BNB`;
 
-        // USDT (BEP20) balance
-        const usdtAddress = "0x55d398326f99059fF775485246999027B3197955"; // USDT on BSC
-        const usdtABI = [
-          {
-            constant: true,
-            inputs: [{ name: "owner", type: "address" }],
-            name: "balanceOf",
-            outputs: [{ name: "balance", type: "uint256" }],
-            type: "function",
-          },
-        ];
+        const usdtAddress = "0x55d398326f99059fF775485246999027B3197955"; // USDT BEP20
+        const usdtABI = [{
+          constant: true,
+          inputs: [{ name: "owner", type: "address" }],
+          name: "balanceOf",
+          outputs: [{ name: "balance", type: "uint256" }],
+          type: "function",
+        }];
 
         const usdtContract = new web3.eth.Contract(usdtABI, usdtAddress);
         const usdtRaw = await usdtContract.methods.balanceOf(userAddress).call();
         const usdtBalance = web3.utils.fromWei(usdtRaw, 'ether');
         document.getElementById("usdtBalance").innerText = `${usdtBalance} USDT`;
       } catch (error) {
-        console.error("Balance fetch error:", error);
+        console.error("Fetch balance error:", error);
       }
     }
   </script>
