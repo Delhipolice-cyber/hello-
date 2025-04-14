@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Trust Wallet Connect</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    button {
+      padding: 12px 20px;
+      font-size: 16px;
+      background-color: #0084ff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .info {
+      margin-top: 20px;
+      background: #eee;
+      padding: 15px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Connect Trust Wallet & Switch to BNB</h2>
+  <button onclick="connectWallet()">Connect Wallet</button>
+
+  <div class="info" id="walletInfo" style="display: none;">
+    <p><strong>Wallet Address:</strong> <span id="walletAddress"></span></p>
+    <p><strong>BNB Balance:</strong> <span id="bnbBalance"></span></p>
+    <p><strong>Current Network:</strong> <span id="networkName"></span></p>
+  </div>
+
+  <div class="info" id="transactionInfo" style="display: none;">
+    <p><strong>Transaction Details:</strong></p>
+    <p><strong>To Address:</strong> <input type="text" id="toAddress" placeholder="0xRecipientAddress"></p>
+    <p><strong>Amount (BNB):</strong> <input type="number" id="amount" placeholder="0.01"></p>
+    <button onclick="signAndSendTransaction()">Sign and Send Transaction</button>
+  </div>
+
+  <script>
+    let web3;
+    let userAddress;
+
+    async function connectWallet() {
+      if (!window.ethereum) {
+        alert("Trust Wallet or MetaMask not found. Please install.");
+        return;
+      }
+
+      try {
+        // Step 1: Connect Wallet
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        userAddress = accounts[0];
+        web3 = new Web3(window.ethereum);
+        document.getElementById("walletAddress").innerText = userAddress;
+
+        // Step 2: Switch to BNB
+        await switchToBSC();
+
+        // Step 3: Show balance and network
+        await showWalletInfo();
+
+        // Step 4: Show Transaction Form
+        document.getElementById("transactionInfo").style.display = "block";
+
+      } catch (err) {
+        console.error("Connection failed:", err);
+        alert("Error connecting wallet or switching network.");
+      }
+    }
+
+    async function switchToBSC() {
+      const bscChainId = '0x38'; // BNB Smart Chain = 56 in hex
+
+      try {
+        const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+        if (currentChainId === bscChainId) {
+          console.log("Already on BNB Chain.");
+          return;
+        }
+
+        // Try switching to BSC
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: bscChainId }],
+        });
+
+        console.log("Switched to BNB Chain.");
+
+      } catch (switchError) {
+        // If the chain is not added to MetaMask/TrustWallet
+        if (switchError.code === 4902) {
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: bscChainId,
+                chainName: 'BNB Smart Chain',
+                rpcUrls: ['https://bsc-dataseed.binance.org/'],
+                nativeCurrency: {
+                  name: 'BNB',
+                  symbol: 'BNB',
+                  decimals: 18
+                },
+                blockExplorerUrls: ['https://bscscan.com']
+              }]
+            });
+          } catch (addError) {
+            console.error("Add chain error:", addError);
+            throw addError;
+          }
+        } else {
+          throw switchError;
+        }
+      }
+    }
+
+    async function showWalletInfo() {
+      try {
+        const bnbBalanceWei = await web3.eth.getBalance(userAddress);
+        const bnbBalance = web3.utils.fromWei(bnbBalanceWei, 'ether');
+        document.getElementById("bnbBalance").innerText = `${bnbBalance} BNB`;
+
+        const chainId = await web3.eth.getChainId();
+        let networkName = 'Unknown';
+
+        if (chainId === 56) networkName = 'BNB Smart Chain';
+        else if (chainId === 1) networkName = 'Ethereum Mainnet';
+        else if (chainId === 137) networkName = 'Polygon';
+        else networkName = `Chain ID ${chainId}`;
+
+        document.getElementById("networkName").innerText = networkName;
+        document.getElementById("walletInfo").style.display = "block";
+
+      } catch (err) {
+        console.error("Failed to load wallet info:", err);
+      }
+    }
+
+    async function signAndSendTransaction() {
+      const toAddress = document.getElementById("toAddress").value;
+      const amount = document.getElementById("amount").value;
+
+      if (!toAddress || !amount) {
+        alert("Please enter both the recipient address and the amount.");
+        return;
+      }
+
+      try {
+        // Step 1: Create transaction object
+        const tx = {
+          from: userAddress,
+          to: toAddress,
+          value: web3.utils.toWei(amount, 'ether'), // Convert amount to Wei
+          gas: 21000, // Standard gas for a simple transfer
+          gasPrice: await web3.eth.getGasPrice(),
+        };
+
+        // Step 2: Sign the transaction
+        const signedTx = await web3.eth.personal.signTransaction(tx, userAddress);
+
+        // Step 3: Send the transaction
+        const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+
+        console.log("Transaction successful:", receipt);
+        alert("Transaction successful! TxHash: " + receipt.transactionHash);
+      } catch (err) {
+        console.error("Transaction failed:", err);
+        alert("Transaction failed.");
+      }
+    }
+  </script>
+</body>
+</html>
