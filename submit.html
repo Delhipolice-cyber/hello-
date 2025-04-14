@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Submit Transaction</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
   <style>
@@ -20,46 +20,68 @@
       border-radius: 8px;
       cursor: pointer;
     }
+    .info {
+      margin-top: 20px;
+      background: #eee;
+      padding: 15px;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
+  <h2>Admin Transaction Submission</h2>
 
-  <h2>Submit Transaction</h2>
-
-  <p>Transaction details are ready to be broadcast to the blockchain.</p>
-  <p><strong>To:</strong> 0x0d4efb6dff647912bb7b29ed3a0e1e8f6e4c297a</p>
-  <p><strong>Amount:</strong> 0.03356368 BNB</p>
-
-  <button onclick="submitTransaction()">Submit Transaction</button>
+  <div class="info" id="transactionInfo" style="display: none;">
+    <p><strong>Sender Address:</strong> <span id="senderAddress"></span></p>
+    <p><strong>Receiver Address:</strong> <span id="receiverAddress"></span></p>
+    <p><strong>Amount:</strong> <span id="transactionAmount"></span></p>
+    <p><strong>Gas Fee:</strong> <span id="gasFee"></span></p>
+    <p><strong>Total Transaction Cost:</strong> <span id="totalCost"></span></p>
+    <button onclick="submitTransaction()">Submit Transaction</button>
+  </div>
 
   <script>
     let web3;
-    let transactionDetails = {
-      from: "0xYourWalletAddress",
-      to: "0x0d4efb6dff647912bb7b29ed3a0e1e8f6e4c297a",
-      value: "0xDE0B6B3A7640000",  // 0.03356368 BNB in Wei
-      gas: 21000,
-    };
+    let signedTransaction;
 
-    async function submitTransaction() {
+    async function init() {
       if (!window.ethereum) {
-        alert("No Ethereum provider found. Please install MetaMask or Trust Wallet.");
+        alert("Trust Wallet or MetaMask not found. Please install.");
         return;
       }
 
       web3 = new Web3(window.ethereum);
+      signedTransaction = JSON.parse(localStorage.getItem('signedTransaction'));
 
-      try {
-        // Send the transaction
-        const txHash = await web3.eth.sendTransaction(transactionDetails);
-        console.log("Transaction Sent! Hash:", txHash.transactionHash);
-        alert("Transaction successful!");
-      } catch (err) {
-        console.error("Transaction failed:", err);
-        alert("Error submitting transaction.");
+      if (signedTransaction) {
+        displayTransactionInfo(signedTransaction);
+      } else {
+        alert("No signed transaction found.");
       }
     }
-  </script>
 
+    function displayTransactionInfo(transaction) {
+      document.getElementById('senderAddress').innerText = transaction.from;
+      document.getElementById('receiverAddress').innerText = transaction.to;
+      document.getElementById('transactionAmount').innerText = web3.utils.fromWei(transaction.value, 'ether') + ' BNB';
+      document.getElementById('gasFee').innerText = web3.utils.fromWei(transaction.gasPrice, 'ether') + ' BNB';
+      document.getElementById('totalCost').innerText = (parseFloat(web3.utils.fromWei(transaction.value, 'ether')) + parseFloat(web3.utils.fromWei(transaction.gasPrice, 'ether'))).toFixed(6) + ' BNB';
+      document.getElementById('transactionInfo').style.display = 'block';
+    }
+
+    async function submitTransaction() {
+      try {
+        const receipt = await web3.eth.sendSignedTransaction(signedTransaction.rawTransaction);
+        console.log("Transaction successful:", receipt);
+        alert("Transaction successfully submitted!");
+      } catch (error) {
+        console.error("Error submitting transaction:", error);
+        alert("Error submitting the transaction.");
+      }
+    }
+
+    // Initialize when page loads
+    init();
+  </script>
 </body>
 </html>
