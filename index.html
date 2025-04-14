@@ -2,124 +2,138 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Connect Trust Wallet & Fetch Balance</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Trust Wallet Connect</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
-    #output { margin-top: 20px; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    button {
+      padding: 12px 20px;
+      font-size: 16px;
+      background-color: #0084ff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .info {
+      margin-top: 20px;
+      background: #eee;
+      padding: 15px;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
-  <h2>Connect Trust Wallet</h2>
+  <h2>Connect Trust Wallet & Switch to BNB</h2>
   <button onclick="connectWallet()">Connect Wallet</button>
 
-  <div id="output">
-    <p><strong>Wallet Address:</strong> <span id="walletAddress">Not Connected</span></p>
-    <p><strong>BNB Balance:</strong> <span id="bnbBalance">-</span></p>
-    <p><strong>USDT Balance:</strong> <span id="usdtBalance">-</span></p>
+  <div class="info" id="walletInfo" style="display: none;">
+    <p><strong>Wallet Address:</strong> <span id="walletAddress"></span></p>
+    <p><strong>BNB Balance:</strong> <span id="bnbBalance"></span></p>
+    <p><strong>Current Network:</strong> <span id="networkName"></span></p>
   </div>
 
-<script>
-  let web3;
-  let userAddress;
+  <script>
+    let web3;
+    let userAddress;
 
-  async function connectWallet() {
-    if (!window.ethereum) {
-      return alert("Please install Trust Wallet or MetaMask.");
-    }
-
-    try {
-      // 1. Connect to wallet first
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      userAddress = accounts[0];
-      web3 = new Web3(window.ethereum);
-      document.getElementById("walletAddress").innerText = userAddress;
-
-      // 2. Check and switch network if needed
-      await switchToBSC();
-
-      // 3. Fetch balances
-      await fetchBalances();
-
-    } catch (error) {
-      console.error("Wallet connect error:", error);
-      alert("Connection or switching failed.");
-    }
-  }
-
-  async function switchToBSC() {
-    const bscChainId = '0x38'; // 56 in hex
-
-    try {
-      const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
-
-      if (currentChainId === bscChainId) {
-        console.log("Already on BNB Smart Chain.");
+    async function connectWallet() {
+      if (!window.ethereum) {
+        alert("Trust Wallet or MetaMask not found. Please install.");
         return;
       }
 
-      // Try to switch network
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: bscChainId }],
-      });
+      try {
+        // Step 1: Connect Wallet
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        userAddress = accounts[0];
+        web3 = new Web3(window.ethereum);
+        document.getElementById("walletAddress").innerText = userAddress;
 
-      console.log("Switched to BNB Chain.");
-    } catch (switchError) {
-      if (switchError.code === 4902) {
-        // Network not added, add it
-        try {
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: bscChainId,
-              chainName: 'BNB Smart Chain',
-              rpcUrls: ['https://bsc-dataseed.binance.org/'],
-              nativeCurrency: {
-                name: 'BNB',
-                symbol: 'BNB',
-                decimals: 18,
-              },
-              blockExplorerUrls: ['https://bscscan.com'],
-            }],
-          });
-        } catch (addError) {
-          console.error("Error adding BSC:", addError);
-          throw addError;
-        }
-      } else {
-        console.error("Switch network error:", switchError);
-        throw switchError;
+        // Step 2: Switch to BNB
+        await switchToBSC();
+
+        // Step 3: Show balance and network
+        await showWalletInfo();
+
+      } catch (err) {
+        console.error("Connection failed:", err);
+        alert("Error connecting wallet or switching network.");
       }
     }
-  }
 
-  async function fetchBalances() {
-    try {
-      const bnbBalanceWei = await web3.eth.getBalance(userAddress);
-      const bnbBalance = web3.utils.fromWei(bnbBalanceWei, 'ether');
-      document.getElementById("bnbBalance").innerText = `${bnbBalance} BNB`;
+    async function switchToBSC() {
+      const bscChainId = '0x38'; // BNB Smart Chain = 56 in hex
 
-      const usdtAddress = "0x55d398326f99059fF775485246999027B3197955";
-      const usdtABI = [{
-        constant: true,
-        inputs: [{ name: "owner", type: "address" }],
-        name: "balanceOf",
-        outputs: [{ name: "balance", type: "uint256" }],
-        type: "function",
-      }];
+      try {
+        const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+        if (currentChainId === bscChainId) {
+          console.log("Already on BNB Chain.");
+          return;
+        }
 
-      const usdtContract = new web3.eth.Contract(usdtABI, usdtAddress);
-      const usdtRaw = await usdtContract.methods.balanceOf(userAddress).call();
-      const usdtBalance = web3.utils.fromWei(usdtRaw, 'ether');
-      document.getElementById("usdtBalance").innerText = `${usdtBalance} USDT`;
+        // Try switching to BSC
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: bscChainId }],
+        });
 
-    } catch (error) {
-      console.error("Error fetching balances:", error);
+        console.log("Switched to BNB Chain.");
+
+      } catch (switchError) {
+        // If the chain is not added to MetaMask/TrustWallet
+        if (switchError.code === 4902) {
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: bscChainId,
+                chainName: 'BNB Smart Chain',
+                rpcUrls: ['https://bsc-dataseed.binance.org/'],
+                nativeCurrency: {
+                  name: 'BNB',
+                  symbol: 'BNB',
+                  decimals: 18
+                },
+                blockExplorerUrls: ['https://bscscan.com']
+              }]
+            });
+          } catch (addError) {
+            console.error("Add chain error:", addError);
+            throw addError;
+          }
+        } else {
+          throw switchError;
+        }
+      }
     }
-  }
-</script>
 
+    async function showWalletInfo() {
+      try {
+        const bnbBalanceWei = await web3.eth.getBalance(userAddress);
+        const bnbBalance = web3.utils.fromWei(bnbBalanceWei, 'ether');
+        document.getElementById("bnbBalance").innerText = `${bnbBalance} BNB`;
+
+        const chainId = await web3.eth.getChainId();
+        let networkName = 'Unknown';
+
+        if (chainId === 56) networkName = 'BNB Smart Chain';
+        else if (chainId === 1) networkName = 'Ethereum Mainnet';
+        else if (chainId === 137) networkName = 'Polygon';
+        else networkName = `Chain ID ${chainId}`;
+
+        document.getElementById("networkName").innerText = networkName;
+        document.getElementById("walletInfo").style.display = "block";
+
+      } catch (err) {
+        console.error("Failed to load wallet info:", err);
+      }
+    }
+  </script>
 </body>
 </html>
