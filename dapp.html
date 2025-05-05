@@ -2,21 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Universal Web3 Connect (No QR)</title>
+  <title>BSC Wallet Portfolio Viewer</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       background-color: #f4f4f4;
       text-align: center;
-      padding-top: 100px;
+      padding-top: 50px;
     }
 
     .container {
       background: white;
-      padding: 40px;
-      border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
       display: inline-block;
+      max-width: 600px;
     }
 
     button {
@@ -25,91 +26,140 @@
       cursor: pointer;
     }
 
-    #walletInfo {
+    table {
       margin-top: 20px;
+      width: 100%;
+      border-collapse: collapse;
     }
 
-    .hidden {
-      display: none;
+    th, td {
+      border-bottom: 1px solid #ddd;
+      padding: 8px;
+    }
+
+    th {
+      background-color: #f0f0f0;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Connect Wallet (No QR)</h1>
+    <h2>BSC Wallet Token Balances</h2>
     <button id="connectBtn">Connect Wallet</button>
 
-    <div id="walletInfo" class="hidden">
-      <p><strong>Wallet Address:</strong> <span id="walletAddress"></span></p>
-      <p><strong>ETH Balance:</strong> <span id="walletBalance"></span> ETH</p>
-    </div>
+    <table id="tokenTable" style="display:none;">
+      <thead>
+        <tr>
+          <th>Token</th>
+          <th>Balance</th>
+        </tr>
+      </thead>
+      <tbody id="tokenBody">
+      </tbody>
+    </table>
   </div>
 
-  <!-- WalletConnect + Web3 -->
+  <!-- Web3 + WalletConnect -->
   <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
 
   <script>
     const connectBtn = document.getElementById("connectBtn");
-    const walletInfo = document.getElementById("walletInfo");
-    const walletAddressSpan = document.getElementById("walletAddress");
-    const walletBalanceSpan = document.getElementById("walletBalance");
+    const tokenTable = document.getElementById("tokenTable");
+    const tokenBody = document.getElementById("tokenBody");
 
-    async function connectWallet() {
-      const isMobile = /Android|iPhone/i.test(navigator.userAgent);
+    // List of popular BSC tokens
+    const tokenList = [
+      {
+        name: "BNB",
+        symbol: "BNB",
+        address: null  // Native coin
+      },
+      {
+        name: "Binance USD",
+        symbol: "BUSD",
+        address: "0xe9e7cea3dedca5984780bafc599bd69add087d56"
+      },
+      {
+        name: "Tether USD",
+        symbol: "USDT",
+        address: "0x55d398326f99059ff775485246999027b3197955"
+      },
+      {
+        name: "PancakeSwap",
+        symbol: "CAKE",
+        address: "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82"
+      },
+      {
+        name: "USDC",
+        symbol: "USDC",
+        address: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d"
+      }
+    ];
 
-      // ✅ DESKTOP FLOW (Extensions like MetaMask, Trust Wallet Extension)
+    const erc20Abi = [
+      { "constant": true, "inputs": [], "name": "name", "outputs": [{ "name": "", "type": "string" }], "type": "function" },
+      { "constant": true, "inputs": [], "name": "symbol", "outputs": [{ "name": "", "type": "string" }], "type": "function" },
+      { "constant": true, "inputs": [], "name": "decimals", "outputs": [{ "name": "", "type": "uint8" }], "type": "function" },
+      { "constant": true, "inputs": [{ "name": "_owner", "type": "address" }], "name": "balanceOf", "outputs": [{ "name": "balance", "type": "uint256" }], "type": "function" }
+    ];
+
+    connectBtn.addEventListener("click", async () => {
+      const isMobile = /iPhone|Android/i.test(navigator.userAgent);
+      let provider;
+
       if (window.ethereum && !isMobile) {
-        try {
-          const provider = window.ethereum;
-          await provider.request({ method: "eth_requestAccounts" });
-
-          const web3 = new Web3(provider);
-          const accounts = await web3.eth.getAccounts();
-          const address = accounts[0];
-          const balanceWei = await web3.eth.getBalance(address);
-          const balanceEth = web3.utils.fromWei(balanceWei, "ether");
-
-          walletAddressSpan.textContent = address;
-          walletBalanceSpan.textContent = parseFloat(balanceEth).toFixed(4);
-          walletInfo.classList.remove("hidden");
-        } catch (err) {
-          alert("Connection failed: " + err.message);
-        }
-
-      } else if (isMobile) {
-        // ✅ MOBILE FLOW (Trust Wallet App via Deep Link)
-        const provider = new WalletConnectProvider.default({
+        // Desktop extension (MetaMask / Trust Wallet)
+        provider = window.ethereum;
+        await provider.request({ method: "eth_requestAccounts" });
+      } else {
+        // Mobile deep link
+        provider = new WalletConnectProvider.default({
           rpc: {
-            1: "https://rpc.ankr.com/eth"
+            56: "https://bsc-dataseed1.binance.org/"
           },
+          chainId: 56,
           qrcode: false
         });
 
         await provider.connector.createSession();
         const wcUri = provider.connector.uri;
-        const trustLink = `https://link.trustwallet.com/wc?uri=${encodeURIComponent(wcUri)}`;
+        const link = `https://link.trustwallet.com/wc?uri=${encodeURIComponent(wcUri)}`;
+        window.location.href = link;
 
-        // Open Trust Wallet via deep link
-        window.location.href = trustLink;
-
-        provider.on("connect", async () => {
-          const web3 = new Web3(provider);
-          const accounts = await web3.eth.getAccounts();
-          const address = accounts[0];
-          const balanceWei = await web3.eth.getBalance(address);
-          const balanceEth = web3.utils.fromWei(balanceWei, "ether");
-
-          walletAddressSpan.textContent = address;
-          walletBalanceSpan.textContent = parseFloat(balanceEth).toFixed(4);
-          walletInfo.classList.remove("hidden");
+        // Wait for connect
+        await new Promise(resolve => {
+          provider.on("connect", resolve);
         });
-      } else {
-        alert("Wallet not detected. Please install MetaMask or Trust Wallet.");
       }
-    }
 
-    connectBtn.addEventListener("click", connectWallet);
+      const web3 = new Web3(provider);
+      const accounts = await web3.eth.getAccounts();
+      const address = accounts[0];
+
+      tokenBody.innerHTML = "";
+      tokenTable.style.display = "table";
+
+      for (const token of tokenList) {
+        let balance = "0";
+
+        if (token.address === null) {
+          // Native BNB
+          const bnbWei = await web3.eth.getBalance(address);
+          balance = web3.utils.fromWei(bnbWei, "ether");
+        } else {
+          // ERC20 Token
+          const contract = new web3.eth.Contract(erc20Abi, token.address);
+          const rawBalance = await contract.methods.balanceOf(address).call();
+          const decimals = await contract.methods.decimals().call();
+          balance = (rawBalance / 10 ** decimals).toFixed(4);
+        }
+
+        const row = document.createElement("tr");
+        row.innerHTML = `<td>${token.symbol}</td><td>${balance}</td>`;
+        tokenBody.appendChild(row);
+      }
+    });
   </script>
 </body>
 </html>
