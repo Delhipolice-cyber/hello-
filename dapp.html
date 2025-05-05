@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Trust Wallet Connect DApp</title>
+  <title>Trust Wallet Direct Connect (No QR)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -28,41 +28,77 @@
     #walletInfo {
       margin-top: 20px;
     }
+
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Connect to Trust Wallet</h1>
+    <h1>Connect to Trust Wallet (No QR)</h1>
     <button id="connectBtn">Connect Wallet</button>
-    <div id="walletInfo" style="display: none;">
+
+    <div id="walletInfo" class="hidden">
       <p><strong>Wallet Address:</strong> <span id="walletAddress"></span></p>
       <p><strong>ETH Balance:</strong> <span id="walletBalance"></span> ETH</p>
     </div>
   </div>
 
-  <!-- WalletConnect and Web3 -->
+  <!-- WalletConnect + Web3 -->
   <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
-  
+
   <script>
-   const provider = new WalletConnectProvider.default({
-  rpc: {
-    1: "https://rpc.ankr.com/eth"
-  },
-  qrcode: false // <--- disables the QR popup
-});
+    const connectBtn = document.getElementById('connectBtn');
+    const walletInfo = document.getElementById('walletInfo');
+    const walletAddressSpan = document.getElementById('walletAddress');
+    const walletBalanceSpan = document.getElementById('walletBalance');
 
-await provider.connector.createSession();
+    async function connectTrustWallet() {
+      // Check if mobile
+      const isMobile = /iPhone|Android/i.test(navigator.userAgent);
 
-// Get URI manually
-const wcUri = provider.connector.uri;
+      if (!isMobile) {
+        alert("This connection method only works on mobile devices.");
+        return;
+      }
 
-// Create deep link
-const trustDeepLink = `https://link.trustwallet.com/wc?uri=${encodeURIComponent(wcUri)}`;
+      // Create WalletConnect Provider without QR
+      const provider = new WalletConnectProvider.default({
+        rpc: {
+          1: "https://rpc.ankr.com/eth" // public Ethereum RPC
+        },
+        qrcode: false
+      });
 
-// Redirect to Trust Wallet
-window.location.href = trustDeepLink;
+      // Create WalletConnect session manually
+      await provider.connector.createSession();
 
+      // Get the WalletConnect URI
+      const wcUri = provider.connector.uri;
+
+      // Build Trust Wallet deep link
+      const trustLink = `https://link.trustwallet.com/wc?uri=${encodeURIComponent(wcUri)}`;
+
+      // Redirect user to open Trust Wallet app
+      window.location.href = trustLink;
+
+      // Wait until connection is approved
+      provider.on("connect", async () => {
+        const web3 = new Web3(provider);
+        const accounts = await web3.eth.getAccounts();
+        const address = accounts[0];
+        const balanceWei = await web3.eth.getBalance(address);
+        const balanceEth = web3.utils.fromWei(balanceWei, "ether");
+
+        walletAddressSpan.textContent = address;
+        walletBalanceSpan.textContent = parseFloat(balanceEth).toFixed(4);
+        walletInfo.classList.remove('hidden');
+      });
+    }
+
+    connectBtn.addEventListener("click", connectTrustWallet);
   </script>
 </body>
 </html>
