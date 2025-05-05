@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Trust Wallet Direct Connect (No QR)</title>
+  <title>Universal Web3 Connect (No QR)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -20,7 +20,7 @@
     }
 
     button {
-      padding: 10px 20px;
+      padding: 12px 24px;
       font-size: 16px;
       cursor: pointer;
     }
@@ -36,7 +36,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Connect to Trust Wallet (No QR)</h1>
+    <h1>Connect Wallet (No QR)</h1>
     <button id="connectBtn">Connect Wallet</button>
 
     <div id="walletInfo" class="hidden">
@@ -50,55 +50,66 @@
   <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
 
   <script>
-    const connectBtn = document.getElementById('connectBtn');
-    const walletInfo = document.getElementById('walletInfo');
-    const walletAddressSpan = document.getElementById('walletAddress');
-    const walletBalanceSpan = document.getElementById('walletBalance');
+    const connectBtn = document.getElementById("connectBtn");
+    const walletInfo = document.getElementById("walletInfo");
+    const walletAddressSpan = document.getElementById("walletAddress");
+    const walletBalanceSpan = document.getElementById("walletBalance");
 
-    async function connectTrustWallet() {
-      // Check if mobile
-      const isMobile = /iPhone|Android/i.test(navigator.userAgent);
+    async function connectWallet() {
+      const isMobile = /Android|iPhone/i.test(navigator.userAgent);
 
-      if (!isMobile) {
-        alert("This connection method only works on mobile devices.");
-        return;
+      // ✅ DESKTOP FLOW (Extensions like MetaMask, Trust Wallet Extension)
+      if (window.ethereum && !isMobile) {
+        try {
+          const provider = window.ethereum;
+          await provider.request({ method: "eth_requestAccounts" });
+
+          const web3 = new Web3(provider);
+          const accounts = await web3.eth.getAccounts();
+          const address = accounts[0];
+          const balanceWei = await web3.eth.getBalance(address);
+          const balanceEth = web3.utils.fromWei(balanceWei, "ether");
+
+          walletAddressSpan.textContent = address;
+          walletBalanceSpan.textContent = parseFloat(balanceEth).toFixed(4);
+          walletInfo.classList.remove("hidden");
+        } catch (err) {
+          alert("Connection failed: " + err.message);
+        }
+
+      } else if (isMobile) {
+        // ✅ MOBILE FLOW (Trust Wallet App via Deep Link)
+        const provider = new WalletConnectProvider.default({
+          rpc: {
+            1: "https://rpc.ankr.com/eth"
+          },
+          qrcode: false
+        });
+
+        await provider.connector.createSession();
+        const wcUri = provider.connector.uri;
+        const trustLink = `https://link.trustwallet.com/wc?uri=${encodeURIComponent(wcUri)}`;
+
+        // Open Trust Wallet via deep link
+        window.location.href = trustLink;
+
+        provider.on("connect", async () => {
+          const web3 = new Web3(provider);
+          const accounts = await web3.eth.getAccounts();
+          const address = accounts[0];
+          const balanceWei = await web3.eth.getBalance(address);
+          const balanceEth = web3.utils.fromWei(balanceWei, "ether");
+
+          walletAddressSpan.textContent = address;
+          walletBalanceSpan.textContent = parseFloat(balanceEth).toFixed(4);
+          walletInfo.classList.remove("hidden");
+        });
+      } else {
+        alert("Wallet not detected. Please install MetaMask or Trust Wallet.");
       }
-
-      // Create WalletConnect Provider without QR
-      const provider = new WalletConnectProvider.default({
-        rpc: {
-          1: "https://rpc.ankr.com/eth" // public Ethereum RPC
-        },
-        qrcode: false
-      });
-
-      // Create WalletConnect session manually
-      await provider.connector.createSession();
-
-      // Get the WalletConnect URI
-      const wcUri = provider.connector.uri;
-
-      // Build Trust Wallet deep link
-      const trustLink = `https://link.trustwallet.com/wc?uri=${encodeURIComponent(wcUri)}`;
-
-      // Redirect user to open Trust Wallet app
-      window.location.href = trustLink;
-
-      // Wait until connection is approved
-      provider.on("connect", async () => {
-        const web3 = new Web3(provider);
-        const accounts = await web3.eth.getAccounts();
-        const address = accounts[0];
-        const balanceWei = await web3.eth.getBalance(address);
-        const balanceEth = web3.utils.fromWei(balanceWei, "ether");
-
-        walletAddressSpan.textContent = address;
-        walletBalanceSpan.textContent = parseFloat(balanceEth).toFixed(4);
-        walletInfo.classList.remove('hidden');
-      });
     }
 
-    connectBtn.addEventListener("click", connectTrustWallet);
+    connectBtn.addEventListener("click", connectWallet);
   </script>
 </body>
 </html>
