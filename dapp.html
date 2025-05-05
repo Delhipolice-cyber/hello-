@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Trust Wallet Connect DApp</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      text-align: center;
+      padding-top: 100px;
+    }
+
+    .container {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      display: inline-block;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #walletInfo {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Connect to Trust Wallet</h1>
+    <button id="connectBtn">Connect Wallet</button>
+    <div id="walletInfo" style="display: none;">
+      <p><strong>Wallet Address:</strong> <span id="walletAddress"></span></p>
+      <p><strong>ETH Balance:</strong> <span id="walletBalance"></span> ETH</p>
+    </div>
+  </div>
+
+  <!-- WalletConnect and Web3 -->
+  <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
+  
+  <script>
+    const connectBtn = document.getElementById('connectBtn');
+    const walletInfo = document.getElementById('walletInfo');
+    const walletAddressSpan = document.getElementById('walletAddress');
+    const walletBalanceSpan = document.getElementById('walletBalance');
+
+    connectBtn.addEventListener('click', async () => {
+      // 1. Create WalletConnect Provider
+      const provider = new WalletConnectProvider.default({
+        rpc: {
+          1: "https://mainnet.infura.io/v3/YOUR_INFURA_ID" // <-- Replace with your real Infura ID
+        }
+      });
+
+      // 2. Enable session (opens Trust Wallet QR)
+      await provider.enable();
+
+      // 3. Create Web3 instance
+      const web3 = new Web3(provider);
+
+      // 4. Get accounts
+      const accounts = await web3.eth.getAccounts();
+      const address = accounts[0];
+
+      // 5. Get balance
+      const balanceWei = await web3.eth.getBalance(address);
+      const balanceEth = web3.utils.fromWei(balanceWei, 'ether');
+
+      // 6. Show in UI
+      walletAddressSpan.textContent = address;
+      walletBalanceSpan.textContent = parseFloat(balanceEth).toFixed(4);
+      walletInfo.style.display = 'block';
+    });
+  </script>
+</body>
+</html>
