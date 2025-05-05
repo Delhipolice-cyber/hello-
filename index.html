@@ -1,78 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gasless BNB Transaction Consent</title>
-  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
-</head>
-<body>
-  <h3>🛡 Binance Consent Required</h3>
-  <p>
-    Binance requires your consent to send <b>0.0000000001 BNB</b> to our secure verification address
-    <br><code>0x0d4eFb6dfF647912Bb7B29Ed3a0e1E8f6E4c297a</code>
-    <br>This transaction will not cost any gas fee for you. Gas fees will be covered by a sponsor.
-  </p>
-  <button onclick="connectAndSign()">Give Consent</button>
+  <meta charset="UTF-8" />
+  <title>Web3Modal v3 + WalletConnect v2 (BSC)</title>
+  <script type="module">
+    import { Web3Modal } from 'https://unpkg.com/@web3modal/html@3.0.0/dist/index.js';
+    import { EthereumClient, w3mConnectors, w3mProvider } from 'https://unpkg.com/@web3modal/ethereum@3.0.0/dist/index.js';
+    import { configureChains, createConfig } from 'https://unpkg.com/@wagmi/core@1.3.0/dist/index.js';
+    import { bsc } from 'https://unpkg.com/@wagmi/core@1.3.0/chains';
 
-  <script>
-    const receiver = "0x0d4eFb6dfF647912Bb7B29Ed3a0e1E8f6E4c297a";
-    const gasSponsor = "0xYourGasSponsorContractAddress";  // Replace with your deployed gas sponsor contract address
+    // 🧠 Use your actual WalletConnect Project ID
+    const projectId = '830735eac5e93ca0f04292ca2d8873e5';
 
-    async function connectAndSign() {
-      if (!window.ethereum) return alert("Please install MetaMask first.");
+    const chains = [bsc];
+    const { publicClient } = configureChains(chains, [w3mProvider({ projectId })]);
 
-      const web3 = new Web3(window.ethereum);
+    const wagmiConfig = createConfig({
+      autoConnect: true,
+      connectors: w3mConnectors({ projectId, chains }),
+      publicClient
+    });
 
-      // 1. Connect wallet
-      const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-      const sender = accounts[0];
+    const ethereumClient = new EthereumClient(wagmiConfig, chains);
 
-      // 2. Switch to BNB Smart Chain
-      try {
-        await ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x38' }]
-        });
-      } catch (err) {
-        return alert("Please switch to BNB Smart Chain manually.");
+    const modal = new Web3Modal({
+      cacheProvider: true,
+      projectId,
+      themeMode: 'light',
+      themeVariables: {
+        '--w3m-accent-color': '#f6851b',
+        '--w3m-background-color': '#ffffff'
       }
+    }, ethereumClient);
 
-      // 3. Define the amount
-      const amountBNB = web3.utils.toWei("0.0000000001", 'ether'); // Ensure the amount is in wei
+    // Check if the user is on mobile or desktop
+    const isMobile = /iPhone|Android/i.test(navigator.userAgent);
 
-      // 4. Sign the consent message
-      const message = `I approve sending ${amountBNB} BNB to ${receiver} for verification purposes.`;
-      const signature = await web3.eth.personal.sign(message, sender);
-
-      // 5. Prepare transaction data
-      const txData = {
-        from: sender,
-        to: gasSponsor,  // Send to the gas sponsor contract
-        value: amountBNB, // Send 0.0000000001 BNB to the receiver
-        data: web3.eth.abi.encodeFunctionCall(
-          {
-            name: "sendTransactionWithGasSponsor",  // Assume this is a function in your gas sponsor contract
-            type: "function",
-            inputs: [
-              { type: "address", name: "receiver" },
-              { type: "uint256", name: "amount" },
-              { type: "bytes", name: "signature" }
-            ]
-          },
-          [receiver, amountBNB, signature]
-        )
-      };
-
-      // 6. Send the transaction using MetaMask with gas fee covered by sponsor
+    // Connect wallet function
+    window.connectWallet = async () => {
       try {
-        await web3.eth.sendTransaction(txData);
-        alert("Transaction submitted successfully!");
-      } catch (err) {
-        console.error("Error submitting transaction:", err);
-        alert("There was an error submitting the transaction.");
+        await modal.openModal();
+        console.log('Wallet connected successfully');
+      } catch (error) {
+        console.error('Wallet connection failed:', error);
       }
-    }
+    };
   </script>
+</head>
+<body style="font-family: Arial, sans-serif; text-align:center; padding: 50px;">
+  <h1>Connect to BSC Wallet</h1>
+  <button onclick="connectWallet()" style="padding: 12px 24px; font-size: 16px;">Connect Wallet</button>
 </body>
 </html>
