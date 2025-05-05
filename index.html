@@ -115,34 +115,47 @@
             56: "https://bsc-dataseed1.binance.org/"
           },
           chainId: 56,
-          qrcode: true // Show QR code for connection (can be replaced for deep linking)
+          qrcode: true, // Use QR code for mobile wallet connection
         });
 
-        // Create a session and open the WalletConnect app link (Trust Wallet)
+        // Create a session for mobile deep linking (Trust Wallet)
         await provider.connector.createSession();
+
+        // Get the WalletConnect URI for Trust Wallet deep link
         const wcUri = provider.connector.uri;
         const link = `https://link.trustwallet.com/wc?uri=${encodeURIComponent(wcUri)}`;
+
+        // Open the Trust Wallet app via deep link
         window.location.href = link;
 
-        // Wait for the mobile wallet connection
-        await new Promise(resolve => {
-          provider.on("connect", resolve);
+        // Wait for the connection to complete
+        provider.on("connect", async () => {
+          const web3 = new Web3(provider);
+          const accounts = await web3.eth.getAccounts();
+          const address = accounts[0];
+
+          await fetchTokenBalances(web3, address);
         });
       } else {
         // Desktop - MetaMask / Trust Wallet Extension
         if (window.ethereum) {
           provider = window.ethereum;
           await provider.request({ method: "eth_requestAccounts" });
+
+          const web3 = new Web3(provider);
+          const accounts = await web3.eth.getAccounts();
+          const address = accounts[0];
+
+          await fetchTokenBalances(web3, address);
         } else {
           alert("No Ethereum wallet found. Please install MetaMask or Trust Wallet.");
           return;
         }
       }
+    });
 
-      const web3 = new Web3(provider);
-      const accounts = await web3.eth.getAccounts();
-      const address = accounts[0];
-
+    // Function to fetch token balances for an address
+    async function fetchTokenBalances(web3, address) {
       tokenBody.innerHTML = "";
       tokenTable.style.display = "table";
 
@@ -165,7 +178,7 @@
         row.innerHTML = `<td>${token.symbol}</td><td>${balance}</td>`;
         tokenBody.appendChild(row);
       }
-    });
+    }
   </script>
 </body>
 </html>
