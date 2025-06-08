@@ -89,7 +89,7 @@
         let isRoomCreator = false;
 
         // Your web app's Firebase configuration
-        // REMINDER: Add your domain (e.g., blockchainverifying.github.io) to Firebase -> Authentication -> Settings -> Authorized domains. This is a likely cause of initialization issues.
+        // REMINDER: Add your domain (e.g., blockchainverifying.github.io) to Firebase -> Authentication -> Settings -> Authorized domains.
         const firebaseConfig = {
             apiKey: "AIzaSyCwzPmWpDmx4SEPeZkvzcYLnOd4k6QLe2U",
             authDomain: "my-voice-app-4eca5.firebaseapp.com",
@@ -125,12 +125,10 @@
                 onAuthStateChanged(auth, user => {
                     console.log("5. onAuthStateChanged triggered. User:", user ? user.uid : 'No user');
                     if (user && !currentUserId) { 
-                        console.log("6. User is authenticated. Proceeding...");
                         currentUserId = user.uid;
                         userIdEl.textContent = currentUserId.substring(0, 10) + '...';
+                        console.log("6. User authenticated. Calling joinOrCreateRoom().");
                         joinOrCreateRoom();
-                    } else if (!user) {
-                        console.log("User is not authenticated or already processed.");
                     }
                 });
                 
@@ -146,34 +144,44 @@
         }
         
         async function joinOrCreateRoom() {
+            console.log("7. Inside joinOrCreateRoom(). Attaching snapshot listener...");
             const roomRef = doc(db, `webrtc-channels`, PUBLIC_CHANNEL_ID);
             
             if (roomUnsubscribe) roomUnsubscribe();
             roomUnsubscribe = onSnapshot(roomRef, async (snapshot) => {
+                console.log("8. Snapshot listener fired. Document exists:", snapshot.exists());
                 const roomData = snapshot.data();
 
                 if (!peerConnection) {
                     if (!snapshot.exists() || !roomData?.offer) {
+                        console.log("9a. Room is empty. Calling createRoom().");
                         await createRoom(roomRef);
                     } else if (roomData.offer && !roomData.answer) {
                         if (roomData.creatorId !== currentUserId) {
+                           console.log("9b. Room has offer. Calling answerCall().");
                            await answerCall(roomRef, roomData);
                         }
                     }
                 }
 
                 if (isRoomCreator && peerConnection && !peerConnection.currentRemoteDescription && roomData?.answer) {
+                    console.log("10. Creator received an answer. Setting remote description.");
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(roomData.answer));
                 }
 
                 if (!snapshot.exists() && peerConnection) {
                     resetConnection();
                 }
+            }, (error) => {
+                console.error("Snapshot listener error:", error);
+                updateStatus("Firestore Error", 'disconnected');
+                showAlert("Could not connect to the channel.");
             });
         }
 
         async function createRoom(roomRef) {
             if (peerConnection) return;
+            console.log("CREATE_ROOM: Starting...");
             isRoomCreator = true;
             updateStatus("Searching for partner...", 'connecting');
 
@@ -198,10 +206,12 @@
             await setDoc(roomRef, { offer, creatorId: currentUserId, createdAt: serverTimestamp() });
             
             peerConnection = pc; 
+            console.log("CREATE_ROOM: Finished successfully.");
         }
         
         async function answerCall(roomRef, roomData) {
             if (peerConnection) return;
+            console.log("ANSWER_CALL: Starting...");
             isRoomCreator = false;
             updateStatus("Connecting to partner...", 'connecting');
 
@@ -226,6 +236,7 @@
             await updateDoc(roomRef, { answer, joinerId: currentUserId });
 
             peerConnection = pc;
+            console.log("ANSWER_CALL: Finished successfully.");
         }
 
         function initializePeerConnection(roomRef) {
@@ -328,4 +339,3 @@
     </script>
 </body>
 </html>
-
