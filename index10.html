@@ -127,7 +127,6 @@
                     }
                 });
                 
-                // Sign in anonymously since this is a public channel
                 await signInAnonymously(auth);
 
             } catch (e) {
@@ -140,7 +139,6 @@
         async function joinOrCreateRoom() {
             const roomRef = doc(db, `webrtc-channels`, PUBLIC_CHANNEL_ID);
             
-            // Listen to changes in the room
             if (roomUnsubscribe) roomUnsubscribe();
             roomUnsubscribe = onSnapshot(roomRef, async (snapshot) => {
                 const roomData = snapshot.data();
@@ -170,19 +168,21 @@
             isRoomCreator = true;
             updateStatus("Searching for partner...", 'connecting');
 
-            initializePeerConnection(roomRef);
-
+            // FIX: Get microphone access BEFORE initializing the peer connection.
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
                 localAudio.srcObject = localStream;
             } catch (e) {
-                console.error("getUserMedia Error:", e); // DETAILED ERROR LOGGING
+                console.error("getUserMedia Error:", e);
                 updateStatus("Microphone access needed", 'disconnected');
                 showAlert(`Mic Error: ${e.name}. See console for details.`);
                 isRoomCreator = false;
                 return;
             }
+
+            initializePeerConnection(roomRef);
+
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
             
             const offerDescription = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offerDescription);
@@ -196,18 +196,20 @@
             isRoomCreator = false;
             updateStatus("Connecting to partner...", 'connecting');
 
-            initializePeerConnection(roomRef);
-            
+            // FIX: Get microphone access BEFORE initializing the peer connection.
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
                 localAudio.srcObject = localStream;
             } catch(e) {
-                console.error("getUserMedia Error:", e); // DETAILED ERROR LOGGING
+                console.error("getUserMedia Error:", e);
                 updateStatus("Microphone access needed", 'disconnected');
                 showAlert(`Mic Error: ${e.name}. See console for details.`);
                 return;
             }
+
+            initializePeerConnection(roomRef);
+
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
             await peerConnection.setRemoteDescription(new RTCSessionDescription(roomData.offer));
             const answerDescription = await peerConnection.createAnswer();
@@ -250,7 +252,7 @@
             onSnapshot(isRoomCreator ? joinerCandidates : creatorCandidates, (snapshot) => {
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === 'added') {
-                       if (peerConnection.signalingState !== 'closed') {
+                       if (peerConnection && peerConnection.signalingState !== 'closed') {
                            peerConnection.addIceCandidate(new RTCIceCandidate(change.doc.data()));
                        }
                     }
