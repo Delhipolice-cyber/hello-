@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Public Voice Channel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .status-light {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            transition: background-color 0.5s ease-in-out;
+        }
+        .status-light.disconnected { background-color: #ef4444; } /* red-500 */
+        .status-light.connecting { 
+            background-color: #f59e0b; /* amber-500 */
+            animation: pulse-amber 1.5s infinite;
+        }
+        .status-light.connected { 
+            background-color: #22c55e; /* green-500 */
+            animation: pulse-green 2s infinite;
+        }
+        @keyframes pulse-amber {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+            50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+        }
+        @keyframes pulse-green {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-sm mx-auto p-8 bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 text-center">
+        
+        <h1 class="text-3xl font-bold text-white mb-3">Public Voice Channel</h1>
+        <p class="text-gray-400 mb-8">Anyone can join and talk.</p>
+
+        <!-- Status Display -->
+        <div class="bg-gray-700 rounded-lg p-4 flex items-center justify-center space-x-3">
+            <div id="statusLight" class="status-light disconnected"></div>
+            <span id="status" class="font-medium text-gray-300">Initializing...</span>
+        </div>
+        
+        <div class="mt-6 text-xs text-gray-500">
+            Your User ID: <span id="userId" class="font-mono">Loading...</span>
+        </div>
+
+
+        <!-- Hidden Audio Players -->
+        <div class="hidden">
+            <audio id="localAudio" muted autoplay playsinline></audio>
+            <audio id="remoteAudio" autoplay playsinline></audio>
+        </div>
+        
+        <!-- Custom Alert Box -->
+        <div id="alert-box" class="fixed top-5 right-5 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg text-sm opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+    </div>
+
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- PUBLIC CHANNEL CONFIGURATION ---
+        const PUBLIC_CHANNEL_ID = 'default-public-voice-room';
+
+        // --- DOM Elements ---
+        const userIdEl = document.getElementById('userId');
+        const localAudio = document.getElementById('localAudio');
+        const remoteAudio = document.getElementById('remoteAudio');
+        const statusEl = document.getElementById('status');
+        const statusLight = document.getElementById('statusLight');
+        const alertBox = document.getElementById('alert-box');
+        
+        // --- Firebase & App State ---
+        let db, auth;
+        let peerConnection;
+        let localStream;
+        let remoteStream;
+        let currentUserId = null;
+        let roomUnsubscribe = null;
+        let isRoomCreator = false;
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'webrtc-voice-channel-public';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        
+        // --- WebRTC Configuration ---
+        const servers = {
+            iceServers: [
+                { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+            ],
+            iceCandidatePoolSize: 10,
+        };
+
+        // --- Main Initialization ---
+        async function initialize() {
+            if (Object.keys(firebaseConfig).length === 0) {
+                updateStatus("Firebase not configured.", 'disconnected');
+                return;
+            }
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                onAuthStateChanged(auth, user => {
+                    if (user) {
+                        currentUserId = user.uid;
+                        userIdEl.textContent = currentUserId.substring(0, 10) + '...';
+                        joinOrCreateRoom();
+                    }
+                });
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+            } catch (e) {
+                console.error("Initialization Error:", e);
+                updateStatus("Connection Error", 'disconnected');
+                showAlert(`Error: ${e.message}`);
+            }
+        }
+        
+        async function joinOrCreateRoom() {
+            const roomRef = doc(db, `artifacts/${appId}/public/data/webrtc-channels`, PUBLIC_CHANNEL_ID);
+            
+            // Listen to changes in the room
+            if (roomUnsubscribe) roomUnsubscribe();
+            roomUnsubscribe = onSnapshot(roomRef, async (snapshot) => {
+                const roomData = snapshot.data();
+
+                if (!snapshot.exists() || !roomData?.offer) {
+                    // Room is empty or call has ended, try to create it if we are not already in a connection process.
+                    if (!peerConnection) {
+                        createRoom(roomRef);
+                    }
+                } else if (roomData.offer && !roomData.answer) {
+                    // Room has an offer, let's join as the callee
+                    if (!peerConnection && roomData.creatorId !== currentUserId) {
+                       await answerCall(roomRef, roomData);
+                    }
+                }
+
+                // If we are the creator, listen for an answer
+                if (isRoomCreator && peerConnection && !peerConnection.currentRemoteDescription && roomData?.answer) {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(roomData.answer));
+                }
+
+                // Handle disconnection if document is deleted while in a call
+                if (!snapshot.exists() && peerConnection) {
+                    resetConnection();
+                }
+            });
+        }
+
+        async function createRoom(roomRef) {
+            if (peerConnection) return;
+            isRoomCreator = true;
+            updateStatus("Searching for partner...", 'connecting');
+
+            initializePeerConnection(roomRef);
+
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+                localAudio.srcObject = localStream;
+            } catch (e) {
+                updateStatus("Microphone access needed", 'disconnected');
+                showAlert("Please allow microphone access to talk.");
+                isRoomCreator = false;
+                return;
+            }
+            
+            const offerDescription = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offerDescription);
+            
+            const offer = { sdp: offerDescription.sdp, type: offerDescription.type };
+            await setDoc(roomRef, { offer, creatorId: currentUserId, createdAt: serverTimestamp() });
+        }
+        
+        async function answerCall(roomRef, roomData) {
+            if (peerConnection) return;
+            isRoomCreator = false;
+            updateStatus("Connecting to partner...", 'connecting');
+
+            initializePeerConnection(roomRef);
+            
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+                localAudio.srcObject = localStream;
+            } catch(e) {
+                updateStatus("Microphone access needed", 'disconnected');
+                showAlert("Please allow microphone access to talk.");
+                return;
+            }
+
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(roomData.offer));
+            const answerDescription = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answerDescription);
+
+            const answer = { type: answerDescription.type, sdp: answerDescription.sdp };
+            await updateDoc(roomRef, { answer, joinerId: currentUserId });
+        }
+
+
+        function initializePeerConnection(roomRef) {
+            peerConnection = new RTCPeerConnection(servers);
+
+            remoteStream = new MediaStream();
+            remoteAudio.srcObject = remoteStream;
+
+            peerConnection.ontrack = event => {
+                event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                const state = peerConnection.connectionState;
+                if (state === 'connected') {
+                    updateStatus('Connected', 'connected');
+                    if (roomUnsubscribe) roomUnsubscribe(); // Stop listening to changes once connected
+                } else if (['disconnected', 'failed', 'closed'].includes(state)) {
+                    resetConnection();
+                }
+            };
+            
+            // Logic for ICE candidates
+            const creatorCandidates = collection(roomRef, 'creatorCandidates');
+            const joinerCandidates = collection(roomRef, 'joinerCandidates');
+
+            peerConnection.onicecandidate = event => {
+                if(event.candidate) {
+                    addDoc(isRoomCreator ? creatorCandidates : joinerCandidates, event.candidate.toJSON());
+                }
+            };
+
+            onSnapshot(isRoomCreator ? joinerCandidates : creatorCandidates, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added') {
+                       if (peerConnection.signalingState !== 'closed') {
+                           peerConnection.addIceCandidate(new RTCIceCandidate(change.doc.data()));
+                       }
+                    }
+                });
+            });
+        }
+        
+        async function resetConnection() {
+            if (!peerConnection && !localStream) return;
+            
+            updateStatus('Partner disconnected', 'disconnected');
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            
+            localAudio.srcObject = null;
+            remoteAudio.srcObject = null;
+            
+            // Only the creator deletes the room to allow others to join
+            if (isRoomCreator) {
+                try {
+                    const roomRef = doc(db, `artifacts/${appId}/public/data/webrtc-channels`, PUBLIC_CHANNEL_ID);
+                    await deleteDoc(roomRef);
+                } catch(e) {
+                    console.error("Error deleting room:", e);
+                }
+            }
+
+            isRoomCreator = false;
+            // Restart the process of looking for a room
+            setTimeout(joinOrCreateRoom, 1000); 
+        }
+
+        function updateStatus(message, state) {
+            statusEl.textContent = message;
+            statusLight.className = 'status-light ' + state;
+        }
+        
+        function showAlert(message) {
+            alertBox.textContent = message;
+            alertBox.classList.remove('opacity-0');
+            setTimeout(() => {
+                alertBox.classList.add('opacity-0');
+            }, 4000);
+        }
+
+        window.addEventListener('beforeunload', resetConnection);
+
+        // --- Start the application ---
+        initialize();
+
+    </script>
+</body>
+</html>
