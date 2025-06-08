@@ -44,7 +44,6 @@
         <h1 class="text-3xl font-bold text-white mb-3">Public Voice Channel</h1>
         <p class="text-gray-400 mb-8">Anyone can join and talk.</p>
 
-        <!-- Status Display -->
         <div class="bg-gray-700 rounded-lg p-4 flex items-center justify-center space-x-3">
             <div id="statusLight" class="status-light disconnected"></div>
             <span id="status" class="font-medium text-gray-300">Initializing...</span>
@@ -55,13 +54,11 @@
         </div>
 
 
-        <!-- Hidden Audio Players -->
         <div class="hidden">
             <audio id="localAudio" muted autoplay playsinline></audio>
             <audio id="remoteAudio" autoplay playsinline></audio>
         </div>
         
-        <!-- Custom Alert Box -->
         <div id="alert-box" class="fixed top-5 right-5 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg text-sm opacity-0 transition-opacity duration-300 pointer-events-none"></div>
     </div>
 
@@ -149,23 +146,19 @@
                 const roomData = snapshot.data();
 
                 if (!snapshot.exists() || !roomData?.offer) {
-                    // Room is empty or call has ended, try to create it if we are not already in a connection process.
                     if (!peerConnection) {
                         createRoom(roomRef);
                     }
                 } else if (roomData.offer && !roomData.answer) {
-                    // Room has an offer, let's join as the callee
                     if (!peerConnection && roomData.creatorId !== currentUserId) {
                        await answerCall(roomRef, roomData);
                     }
                 }
 
-                // If we are the creator, listen for an answer
                 if (isRoomCreator && peerConnection && !peerConnection.currentRemoteDescription && roomData?.answer) {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(roomData.answer));
                 }
 
-                // Handle disconnection if document is deleted while in a call
                 if (!snapshot.exists() && peerConnection) {
                     resetConnection();
                 }
@@ -184,8 +177,9 @@
                 localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
                 localAudio.srcObject = localStream;
             } catch (e) {
+                console.error("getUserMedia Error:", e); // DETAILED ERROR LOGGING
                 updateStatus("Microphone access needed", 'disconnected');
-                showAlert("Please allow microphone access to talk.");
+                showAlert(`Mic Error: ${e.name}. See console for details.`);
                 isRoomCreator = false;
                 return;
             }
@@ -209,8 +203,9 @@
                 localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
                 localAudio.srcObject = localStream;
             } catch(e) {
+                console.error("getUserMedia Error:", e); // DETAILED ERROR LOGGING
                 updateStatus("Microphone access needed", 'disconnected');
-                showAlert("Please allow microphone access to talk.");
+                showAlert(`Mic Error: ${e.name}. See console for details.`);
                 return;
             }
 
@@ -237,13 +232,12 @@
                 const state = peerConnection.connectionState;
                 if (state === 'connected') {
                     updateStatus('Connected', 'connected');
-                    if (roomUnsubscribe) roomUnsubscribe(); // Stop listening to changes once connected
+                    if (roomUnsubscribe) roomUnsubscribe();
                 } else if (['disconnected', 'failed', 'closed'].includes(state)) {
                     resetConnection();
                 }
             };
             
-            // Logic for ICE candidates
             const creatorCandidates = collection(roomRef, 'creatorCandidates');
             const joinerCandidates = collection(roomRef, 'joinerCandidates');
 
@@ -280,7 +274,6 @@
             localAudio.srcObject = null;
             remoteAudio.srcObject = null;
             
-            // Only the creator deletes the room to allow others to join
             if (isRoomCreator) {
                 try {
                     const roomRef = doc(db, `webrtc-channels`, PUBLIC_CHANNEL_ID);
@@ -291,7 +284,6 @@
             }
 
             isRoomCreator = false;
-            // Restart the process of looking for a room
             setTimeout(joinOrCreateRoom, 1000); 
         }
 
@@ -310,7 +302,6 @@
 
         window.addEventListener('beforeunload', resetConnection);
 
-        // --- Start the application ---
         initialize();
 
     </script>
