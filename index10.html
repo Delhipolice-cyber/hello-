@@ -89,7 +89,7 @@
         let isRoomCreator = false;
 
         // Your web app's Firebase configuration
-        // REMINDER: Add your domain to Firebase -> Authentication -> Settings -> Authorized domains to remove the console warning.
+        // REMINDER: Add your domain (e.g., blockchainverifying.github.io) to Firebase -> Authentication -> Settings -> Authorized domains. This is a likely cause of initialization issues.
         const firebaseConfig = {
             apiKey: "AIzaSyCwzPmWpDmx4SEPeZkvzcYLnOd4k6QLe2U",
             authDomain: "my-voice-app-4eca5.firebaseapp.com",
@@ -110,24 +110,33 @@
 
         // --- Main Initialization ---
         async function initialize() {
+            updateStatus("Initializing...", 'connecting');
             if (!firebaseConfig.apiKey) {
                 updateStatus("Firebase not configured.", 'disconnected');
                 return;
             }
             try {
+                console.log("1. Initializing Firebase app...");
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
+                console.log("2. Setting up auth state listener...");
                 onAuthStateChanged(auth, user => {
-                    if (user && !currentUserId) { // Prevent re-running if auth state flickers
+                    console.log("5. onAuthStateChanged triggered. User:", user ? user.uid : 'No user');
+                    if (user && !currentUserId) { 
+                        console.log("6. User is authenticated. Proceeding...");
                         currentUserId = user.uid;
                         userIdEl.textContent = currentUserId.substring(0, 10) + '...';
                         joinOrCreateRoom();
+                    } else if (!user) {
+                        console.log("User is not authenticated or already processed.");
                     }
                 });
                 
+                console.log("3. Attempting to sign in anonymously...");
                 await signInAnonymously(auth);
+                console.log("4. signInAnonymously call completed.");
 
             } catch (e) {
                 console.error("Initialization Error:", e);
@@ -188,7 +197,7 @@
             const offer = { sdp: offerDescription.sdp, type: offerDescription.type };
             await setDoc(roomRef, { offer, creatorId: currentUserId, createdAt: serverTimestamp() });
             
-            peerConnection = pc; // Assign to global variable after setup
+            peerConnection = pc; 
         }
         
         async function answerCall(roomRef, roomData) {
@@ -216,11 +225,10 @@
             const answer = { type: answerDescription.type, sdp: answerDescription.sdp };
             await updateDoc(roomRef, { answer, joinerId: currentUserId });
 
-            peerConnection = pc; // Assign to global variable after setup
+            peerConnection = pc;
         }
 
         function initializePeerConnection(roomRef) {
-            // FIX: Use a local variable `pc` to prevent race conditions.
             const pc = new RTCPeerConnection(servers);
 
             remoteStream = new MediaStream();
@@ -256,7 +264,7 @@
                     }
                 });
             });
-            return pc; // Return the created connection
+            return pc; 
         }
         
         async function resetConnection() {
@@ -288,9 +296,8 @@
             }
 
             isRoomCreator = false;
-            // Debounce restart to prevent rapid looping
             setTimeout(() => {
-                if (!peerConnection) { // Only try to rejoin if not already in a call
+                if (!peerConnection) {
                     joinOrCreateRoom(); 
                 }
             }, 2000); 
@@ -312,7 +319,7 @@
         window.addEventListener('beforeunload', () => {
              if (isRoomCreator) {
                 const roomRef = doc(db, `webrtc-channels`, PUBLIC_CHANNEL_ID);
-                deleteDoc(roomRef); // Try to clean up on close
+                deleteDoc(roomRef); 
              }
         });
 
@@ -321,3 +328,4 @@
     </script>
 </body>
 </html>
+
