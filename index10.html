@@ -65,7 +65,7 @@
     <script type="module">
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
         // --- PUBLIC CHANNEL CONFIGURATION ---
@@ -89,6 +89,7 @@
         let isRoomCreator = false;
 
         // Your web app's Firebase configuration
+        // REMINDER: Add your domain to Firebase -> Authentication -> Settings -> Authorized domains to remove the console warning.
         const firebaseConfig = {
             apiKey: "AIzaSyCwzPmWpDmx4SEPeZkvzcYLnOd4k6QLe2U",
             authDomain: "my-voice-app-4eca5.firebaseapp.com",
@@ -98,7 +99,6 @@
             appId: "1:972654270500:web:c29a42a09972f5a4ce20b1",
             measurementId: "G-N31J1LYY6G"
         };
-        const appId = firebaseConfig.projectId;
         
         // --- WebRTC Configuration ---
         const servers = {
@@ -120,7 +120,7 @@
                 auth = getAuth(app);
                 
                 onAuthStateChanged(auth, user => {
-                    if (user) {
+                    if (user && !currentUserId) { // Prevent re-running if auth state flickers
                         currentUserId = user.uid;
                         userIdEl.textContent = currentUserId.substring(0, 10) + '...';
                         joinOrCreateRoom();
@@ -143,13 +143,13 @@
             roomUnsubscribe = onSnapshot(roomRef, async (snapshot) => {
                 const roomData = snapshot.data();
 
-                if (!snapshot.exists() || !roomData?.offer) {
-                    if (!peerConnection) {
-                        createRoom(roomRef);
-                    }
-                } else if (roomData.offer && !roomData.answer) {
-                    if (!peerConnection && roomData.creatorId !== currentUserId) {
-                       await answerCall(roomRef, roomData);
+                if (!peerConnection) {
+                    if (!snapshot.exists() || !roomData?.offer) {
+                        await createRoom(roomRef);
+                    } else if (roomData.offer && !roomData.answer) {
+                        if (roomData.creatorId !== currentUserId) {
+                           await answerCall(roomRef, roomData);
+                        }
                     }
                 }
 
@@ -168,27 +168,27 @@
             isRoomCreator = true;
             updateStatus("Searching for partner...", 'connecting');
 
-            // FIX: Get microphone access BEFORE initializing the peer connection.
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                 localAudio.srcObject = localStream;
             } catch (e) {
                 console.error("getUserMedia Error:", e);
                 updateStatus("Microphone access needed", 'disconnected');
-                showAlert(`Mic Error: ${e.name}. See console for details.`);
+                showAlert(`Mic Error: ${e.name}. See console.`);
                 isRoomCreator = false;
                 return;
             }
 
-            initializePeerConnection(roomRef);
-
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            const pc = initializePeerConnection(roomRef);
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
             
-            const offerDescription = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offerDescription);
+            const offerDescription = await pc.createOffer();
+            await pc.setLocalDescription(offerDescription);
             
             const offer = { sdp: offerDescription.sdp, type: offerDescription.type };
             await setDoc(roomRef, { offer, creatorId: currentUserId, createdAt: serverTimestamp() });
+            
+            peerConnection = pc; // Assign to global variable after setup
         }
         
         async function answerCall(roomRef, roomData) {
@@ -196,42 +196,42 @@
             isRoomCreator = false;
             updateStatus("Connecting to partner...", 'connecting');
 
-            // FIX: Get microphone access BEFORE initializing the peer connection.
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                 localAudio.srcObject = localStream;
             } catch(e) {
                 console.error("getUserMedia Error:", e);
                 updateStatus("Microphone access needed", 'disconnected');
-                showAlert(`Mic Error: ${e.name}. See console for details.`);
+                showAlert(`Mic Error: ${e.name}. See console.`);
                 return;
             }
 
-            initializePeerConnection(roomRef);
+            const pc = initializePeerConnection(roomRef);
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(roomData.offer));
-            const answerDescription = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answerDescription);
+            await pc.setRemoteDescription(new RTCSessionDescription(roomData.offer));
+            const answerDescription = await pc.createAnswer();
+            await pc.setLocalDescription(answerDescription);
 
             const answer = { type: answerDescription.type, sdp: answerDescription.sdp };
             await updateDoc(roomRef, { answer, joinerId: currentUserId });
+
+            peerConnection = pc; // Assign to global variable after setup
         }
 
-
         function initializePeerConnection(roomRef) {
-            peerConnection = new RTCPeerConnection(servers);
+            // FIX: Use a local variable `pc` to prevent race conditions.
+            const pc = new RTCPeerConnection(servers);
 
             remoteStream = new MediaStream();
             remoteAudio.srcObject = remoteStream;
 
-            peerConnection.ontrack = event => {
+            pc.ontrack = event => {
                 event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
             };
 
-            peerConnection.onconnectionstatechange = () => {
-                const state = peerConnection.connectionState;
+            pc.onconnectionstatechange = () => {
+                const state = pc.connectionState;
                 if (state === 'connected') {
                     updateStatus('Connected', 'connected');
                     if (roomUnsubscribe) roomUnsubscribe();
@@ -243,7 +243,7 @@
             const creatorCandidates = collection(roomRef, 'creatorCandidates');
             const joinerCandidates = collection(roomRef, 'joinerCandidates');
 
-            peerConnection.onicecandidate = event => {
+            pc.onicecandidate = event => {
                 if(event.candidate) {
                     addDoc(isRoomCreator ? creatorCandidates : joinerCandidates, event.candidate.toJSON());
                 }
@@ -251,13 +251,12 @@
 
             onSnapshot(isRoomCreator ? joinerCandidates : creatorCandidates, (snapshot) => {
                 snapshot.docChanges().forEach((change) => {
-                    if (change.type === 'added') {
-                       if (peerConnection && peerConnection.signalingState !== 'closed') {
-                           peerConnection.addIceCandidate(new RTCIceCandidate(change.doc.data()));
-                       }
+                    if (change.type === 'added' && pc && pc.signalingState !== 'closed') {
+                       pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
                     }
                 });
             });
+            return pc; // Return the created connection
         }
         
         async function resetConnection() {
@@ -279,14 +278,22 @@
             if (isRoomCreator) {
                 try {
                     const roomRef = doc(db, `webrtc-channels`, PUBLIC_CHANNEL_ID);
-                    await deleteDoc(roomRef);
+                    const docSnap = await getDoc(roomRef);
+                    if (docSnap.exists()) {
+                        await deleteDoc(roomRef);
+                    }
                 } catch(e) {
                     console.error("Error deleting room:", e);
                 }
             }
 
             isRoomCreator = false;
-            setTimeout(joinOrCreateRoom, 1000); 
+            // Debounce restart to prevent rapid looping
+            setTimeout(() => {
+                if (!peerConnection) { // Only try to rejoin if not already in a call
+                    joinOrCreateRoom(); 
+                }
+            }, 2000); 
         }
 
         function updateStatus(message, state) {
@@ -302,7 +309,12 @@
             }, 4000);
         }
 
-        window.addEventListener('beforeunload', resetConnection);
+        window.addEventListener('beforeunload', () => {
+             if (isRoomCreator) {
+                const roomRef = doc(db, `webrtc-channels`, PUBLIC_CHANNEL_ID);
+                deleteDoc(roomRef); // Try to clean up on close
+             }
+        });
 
         initialize();
 
