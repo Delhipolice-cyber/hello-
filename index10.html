@@ -67,9 +67,9 @@
 
     <script type="module">
         // Import Firebase modules
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
         // --- PUBLIC CHANNEL CONFIGURATION ---
         const PUBLIC_CHANNEL_ID = 'default-public-voice-room';
@@ -91,8 +91,17 @@
         let roomUnsubscribe = null;
         let isRoomCreator = false;
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'webrtc-voice-channel-public';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCwzPmWpDmx4SEPeZkvzcYLnOd4k6QLe2U",
+            authDomain: "my-voice-app-4eca5.firebaseapp.com",
+            projectId: "my-voice-app-4eca5",
+            storageBucket: "my-voice-app-4eca5.appspot.com",
+            messagingSenderId: "972654270500",
+            appId: "1:972654270500:web:c29a42a09972f5a4ce20b1",
+            measurementId: "G-N31J1LYY6G"
+        };
+        const appId = firebaseConfig.projectId;
         
         // --- WebRTC Configuration ---
         const servers = {
@@ -104,7 +113,7 @@
 
         // --- Main Initialization ---
         async function initialize() {
-            if (Object.keys(firebaseConfig).length === 0) {
+            if (!firebaseConfig.apiKey) {
                 updateStatus("Firebase not configured.", 'disconnected');
                 return;
             }
@@ -120,12 +129,9 @@
                         joinOrCreateRoom();
                     }
                 });
-
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                
+                // Sign in anonymously since this is a public channel
+                await signInAnonymously(auth);
 
             } catch (e) {
                 console.error("Initialization Error:", e);
@@ -135,7 +141,7 @@
         }
         
         async function joinOrCreateRoom() {
-            const roomRef = doc(db, `artifacts/${appId}/public/data/webrtc-channels`, PUBLIC_CHANNEL_ID);
+            const roomRef = doc(db, `webrtc-channels`, PUBLIC_CHANNEL_ID);
             
             // Listen to changes in the room
             if (roomUnsubscribe) roomUnsubscribe();
@@ -277,7 +283,7 @@
             // Only the creator deletes the room to allow others to join
             if (isRoomCreator) {
                 try {
-                    const roomRef = doc(db, `artifacts/${appId}/public/data/webrtc-channels`, PUBLIC_CHANNEL_ID);
+                    const roomRef = doc(db, `webrtc-channels`, PUBLIC_CHANNEL_ID);
                     await deleteDoc(roomRef);
                 } catch(e) {
                     console.error("Error deleting room:", e);
