@@ -294,8 +294,10 @@
             const defreeze_amount_str = defreeze_amount_num.toLocaleString('en-IN');
             const keralaPoliceLogoUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Kerala_State_Police_Logo.png/260px-Kerala_State_Police_Logo.png';
 
+            // FIX: Added `overflow-wrap: break-word;` to the main container to prevent text from overflowing.
+            // This is especially useful for long strings like email addresses.
             return `
-                 <div class="preview-police-letter text-black">
+                 <div class="preview-police-letter text-black" style="overflow-wrap: break-word;">
                      <div class="flex justify-center mb-4">
                          <img src="${keralaPoliceLogoUrl}" alt="Kerala Police Logo" class="h-24">
                      </div>
@@ -320,7 +322,9 @@
                          </ol>
                      </div>
                      <p class="mb-6">Sir,</p>
-                     <p class="text-justify leading-relaxed">
+                     
+                     <!-- FIX: Changed text alignment from 'text-justify' to 'text-left' for better PDF rendering and to avoid layout bugs. -->
+                     <p class="text-left leading-relaxed">
                          This is for your kind notice that the Honorable ${data.court_name} has given a direction to the Investigating Officer of the above case (Ref 1) via the order as per Ref 2.
                          <br><br>
                          As per the orders, the Honorable Court has directed myself to issue a direction to the Manager, ${data.defreeze_bank_name}, to defreeze the frozen amount of <strong>Rs. ${defreeze_amount_str}/-</strong> from the beneficiary account <strong>(A/c No: ${data.defreeze_acc_no}, IFSC: ${data.defreeze_ifsc})</strong> and transfer the above-said amount to the petitioner's bank account <strong>(${data.transfer_bank_name}, A/c No: ${data.transfer_acc_no}, IFSC: ${data.transfer_ifsc})</strong> and submit a compliance report to the court forthwith.
